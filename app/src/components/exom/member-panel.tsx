@@ -1,14 +1,18 @@
 import { cn } from "@/lib/utils"
-import { mockUsers, roleConfig, type User, type Role } from "@/lib/mock-data"
+import { roleConfig, type Role } from "@/lib/mock-data"
 import { Search } from "lucide-react"
+import { useMemberStore } from "@/stores/memberStore"
+import type { Member } from "@/lib/types"
 
 interface MemberPanelProps {
-  onMemberClick?: (user: User) => void
+  onMemberClick?: (member: Member) => void
 }
 
 export function MemberPanel({ onMemberClick }: MemberPanelProps) {
-  // Group users by role
-  const usersByRole: Record<Role, User[]> = {
+  const { members } = useMemberStore()
+
+  // Group members by role
+  const membersByRole: Record<Role, Member[]> = {
     builder: [],
     prefect: [],
     moderator: [],
@@ -16,8 +20,13 @@ export function MemberPanel({ onMemberClick }: MemberPanelProps) {
     fellow: [],
   }
 
-  mockUsers.forEach(user => {
-    usersByRole[user.role].push(user)
+  members.forEach(member => {
+    const key = member.role.toLowerCase() as Role
+    if (membersByRole[key]) {
+      membersByRole[key].push(member)
+    } else {
+      membersByRole.agent.push(member)
+    }
   })
 
   const roleOrder: Role[] = ['builder', 'prefect', 'moderator', 'agent', 'fellow']
@@ -39,11 +48,11 @@ export function MemberPanel({ onMemberClick }: MemberPanelProps) {
       {/* Member List */}
       <div className="flex-1 overflow-y-auto p-2">
         {roleOrder.map(role => {
-          const users = usersByRole[role]
+          const users = membersByRole[role]
           if (users.length === 0) return null
 
           const config = roleConfig[role]
-          const onlineCount = users.filter(u => u.status !== 'offline').length
+          const onlineCount = users.filter(u => u.is_online).length
 
           return (
             <div key={role} className="mb-4">
@@ -51,46 +60,41 @@ export function MemberPanel({ onMemberClick }: MemberPanelProps) {
                 {config.label} — {onlineCount}
               </h3>
               <div className="space-y-0.5">
-                {users.map(user => (
+                {users.map(member => (
                   <button
-                    key={user.id}
-                    onClick={() => onMemberClick?.(user)}
+                    key={member.user_id}
+                    onClick={() => onMemberClick?.(member)}
                     className={cn(
                       "w-full flex items-center gap-3 px-2 py-2 rounded-lg transition-all group",
-                      user.status === 'offline' 
-                        ? "opacity-50 hover:opacity-100" 
+                      !member.is_online
+                        ? "opacity-50 hover:opacity-100"
                         : "hover:bg-secondary/50"
                     )}
                   >
                     <div className="relative flex-shrink-0">
-                      <div 
+                      <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm"
-                        style={{ 
-                          background: `linear-gradient(135deg, ${config.color}80, ${config.color})` 
+                        style={{
+                          background: `linear-gradient(135deg, ${config.color}80, ${config.color})`
                         }}
                       >
-                        {user.username.charAt(0).toUpperCase()}
+                        {member.username.charAt(0).toUpperCase()}
                       </div>
                       <span className={cn(
                         "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card",
-                        user.status === "online" && "bg-online",
-                        user.status === "idle" && "bg-idle",
-                        user.status === "dnd" && "bg-dnd",
-                        user.status === "offline" && "bg-offline"
+                        member.is_online ? "bg-online" : "bg-offline"
                       )} />
                     </div>
-                    
+
                     <div className="flex-1 min-w-0 text-left">
-                      <p 
+                      <p
                         className="text-sm font-medium truncate"
                         style={{ color: config.color }}
                       >
-                        {user.username}
+                        {member.username}
                       </p>
-                      {user.activity && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {user.activity}
-                        </p>
+                      {member.is_host && (
+                        <p className="text-xs text-primary/70 truncate">Host</p>
                       )}
                     </div>
                   </button>

@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Home, Compass, Plus, Settings, Search, Bell, MessageCircle } from "lucide-react"
-import { mockHalls, currentUser } from "@/lib/mock-data"
+import { useAuthStore } from "@/stores/authStore"
+import { useHallStore } from "@/stores/hallStore"
 import {
   Tooltip,
   TooltipContent,
@@ -27,6 +28,9 @@ export function TopNavigation({
   showDMs,
 }: TopNavigationProps) {
   const [searchOpen, setSearchOpen] = useState(false)
+  const { halls } = useHallStore()
+  const { user } = useAuthStore()
+  const displayName = user?.username ?? 'User'
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -68,7 +72,7 @@ export function TopNavigation({
 
             <div className="h-6 w-px bg-border/30 mx-1" />
 
-            {mockHalls.map((hall) => (
+            {halls.map((hall) => (
               <Tooltip key={hall.id}>
                 <TooltipTrigger asChild>
                   <button
@@ -80,7 +84,7 @@ export function TopNavigation({
                         : "bg-secondary/50 hover:bg-secondary text-foreground hover:scale-105"
                     )}
                   >
-                    {hall.icon || hall.name.charAt(0)}
+                    {hall.name.charAt(0)}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -158,14 +162,14 @@ export function TopNavigation({
               >
                 <div className="relative">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-medium text-sm">
-                    {currentUser.username.charAt(0).toUpperCase()}
+                    {displayName.charAt(0).toUpperCase()}
                   </div>
                   <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-online rounded-full border-2 border-background" />
                 </div>
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>{currentUser.username}</p>
+              <p>{displayName}</p>
             </TooltipContent>
           </Tooltip>
         </div>

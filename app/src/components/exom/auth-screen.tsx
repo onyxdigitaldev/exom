@@ -1,12 +1,14 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Eye, EyeOff, ArrowRight, Sparkles } from "lucide-react"
+import { useAuthStore } from "@/stores/authStore"
 
 interface AuthScreenProps {
   onLogin: () => void
 }
 
 export function AuthScreen({ onLogin }: AuthScreenProps) {
+  const { login, register: registerUser, error: authError, loading, clearError } = useAuthStore()
   const [mode, setMode] = useState<"login" | "register">("login")
   const [email, setEmail] = useState("")
   const [username, setUsername] = useState("")
@@ -14,17 +16,32 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    clearError()
 
-    if (mode === "register" && password.length < 8) {
-      setError("Password must be at least 8 characters")
+    if (!username.trim()) {
+      setError("Username is required")
+      return
+    }
+    if (mode === "register" && password.length < 6) {
+      setError("Password must be at least 6 characters")
       return
     }
 
-    onLogin()
+    try {
+      if (mode === "login") {
+        await login(username, password)
+      } else {
+        await registerUser(username, password)
+      }
+    } catch {
+      // Error handled by store
+    }
   }
+
+  const displayError = error || authError
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -161,18 +178,19 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
               </div>
             </div>
 
-            {error && (
+            {displayError && (
               <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                {error}
+                {displayError}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25"
+              disabled={loading}
+              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25 disabled:opacity-50"
             >
-              {mode === "login" ? "Sign In" : "Create Account"}
-              <ArrowRight className="w-4 h-4" />
+              {loading ? "Loading..." : mode === "login" ? "Sign In" : "Create Account"}
+              {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 

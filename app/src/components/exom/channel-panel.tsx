@@ -12,7 +12,8 @@ import {
   Lock,
   Users
 } from "lucide-react"
-import { mockChannels, mockHalls, type Channel } from "@/lib/mock-data"
+import { useHallStore } from "@/stores/hallStore"
+import type { Channel } from "@/lib/types"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +39,8 @@ export function ChannelPanel({
   onHallSettings,
   onCreateChannel,
 }: ChannelPanelProps) {
-  const hall = mockHalls.find(h => h.id === hallId)
+  const { halls, channels } = useHallStore()
+  const hall = halls.find(h => h.id === hallId)
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
 
   const toggleCategory = (category: string) => {
@@ -51,11 +53,18 @@ export function ChannelPanel({
     setCollapsedCategories(next)
   }
 
-  const categories = Array.from(new Set(mockChannels.map(c => c.category)))
+  // Group channels by type into categories
+  const textChannels = channels.filter(c => c.channel_type === 'text' || c.channel_type === 'announcement')
+  const voiceChannels = channels.filter(c => c.channel_type === 'voice' || c.channel_type === 'stage')
+  const categorized = [
+    ...(textChannels.length > 0 ? [{ category: 'TEXT CHANNELS', items: textChannels }] : []),
+    ...(voiceChannels.length > 0 ? [{ category: 'VOICE CHANNELS', items: voiceChannels }] : []),
+  ]
 
-  const getChannelIcon = (type: Channel["type"]) => {
+  const getChannelIcon = (type: string) => {
     switch (type) {
       case "voice":
+      case "stage":
         return Volume2
       case "announcement":
         return Megaphone
@@ -121,8 +130,7 @@ export function ChannelPanel({
 
       {/* Channel List */}
       <div className="flex-1 overflow-y-auto px-2 pb-4">
-        {categories.map((category) => {
-          const categoryChannels = mockChannels.filter(c => c.category === category)
+        {categorized.map(({ category, items: categoryChannels }) => {
           const isCollapsed = collapsedCategories.has(category)
 
           return (
@@ -143,7 +151,7 @@ export function ChannelPanel({
               {!isCollapsed && (
                 <div className="mt-1 space-y-0.5">
                   {categoryChannels.map((channel) => {
-                    const Icon = getChannelIcon(channel.type)
+                    const Icon = getChannelIcon(channel.channel_type)
                     const isActive = channel.id === activeChannel
 
                     return (
@@ -159,58 +167,16 @@ export function ChannelPanel({
                       >
                         <Icon className={cn(
                           "w-4 h-4 flex-shrink-0",
-                          channel.type === "voice" && "text-accent"
+                          channel.channel_type === "voice" && "text-accent"
                         )} />
                         <span className="flex-1 text-left truncate">
                           {channel.name}
                         </span>
-                        {channel.mentionCount && channel.mentionCount > 0 && (
-                          <span className="px-1.5 py-0.5 text-xs font-medium bg-destructive text-destructive-foreground rounded-full">
-                            {channel.mentionCount}
-                          </span>
-                        )}
-                        {channel.unread && !channel.mentionCount && (
-                          <span className="w-2 h-2 bg-primary rounded-full" />
-                        )}
-
-                        {/* Voice channel connected users */}
-                        {channel.type === "voice" && channel.connectedUsers && channel.connectedUsers.length > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            {channel.connectedUsers.length}
-                          </span>
-                        )}
+                        {/* TODO: Wire mention badges from notification store */}
+                        {/* TODO: Wire voice connected users from voice store */}
                       </button>
                     )
                   })}
-                  
-                  {/* Show connected users for voice channels */}
-                  {categoryChannels
-                    .filter(c => c.type === "voice" && c.connectedUsers?.length)
-                    .map(channel => (
-                      <div key={`${channel.id}-users`} className="pl-8 space-y-1 mb-2">
-                        {channel.connectedUsers?.map(user => (
-                          <div 
-                            key={user.id}
-                            className="flex items-center gap-2 py-1 px-2 rounded text-xs text-muted-foreground"
-                          >
-                            <div className="relative">
-                              <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-[10px] font-medium">
-                                {user.username.charAt(0)}
-                              </div>
-                              <span className={cn(
-                                "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-card",
-                                user.status === "online" && "bg-online",
-                                user.status === "idle" && "bg-idle",
-                                user.status === "dnd" && "bg-dnd",
-                                user.status === "offline" && "bg-offline"
-                              )} />
-                            </div>
-                            <span className="truncate">{user.username}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ))
-                  }
                 </div>
               )}
             </div>

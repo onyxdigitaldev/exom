@@ -17,7 +17,10 @@ import {
   MessageSquare,
   ArrowUp
 } from "lucide-react"
-import { mockChannels, mockMessages, roleConfig, type Message, type User } from "@/lib/mock-data"
+import { roleConfig } from "@/lib/mock-data"
+import { useHallStore } from "@/stores/hallStore"
+import { useMessageStore } from "@/stores/messageStore"
+import type { Message as MessageType } from "@/lib/types"
 import {
   Tooltip,
   TooltipContent,
@@ -48,19 +51,20 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
-function getUserRoleColor(user: User): string {
-  return roleConfig[user.role]?.color || '#9CA3AF'
+function getRoleColor(role: string): string {
+  const key = role.toLowerCase() as keyof typeof roleConfig
+  return roleConfig[key]?.color || '#9CA3AF'
 }
 
-function MessageComponent({ 
-  message, 
-  isGrouped 
-}: { 
-  message: Message
-  isGrouped: boolean 
+function MessageComponent({
+  message,
+  isGrouped
+}: {
+  message: MessageType
+  isGrouped: boolean
 }) {
   const [showActions, setShowActions] = useState(false)
-  const roleColor = getUserRoleColor(message.author)
+  const roleColor = getRoleColor(message.sender_role)
 
   return (
     <div 
@@ -116,7 +120,7 @@ function MessageComponent({
         <div className="w-10 flex-shrink-0">
           {!isGrouped ? (
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center text-white font-medium text-sm shadow-md">
-              {message.author.username.charAt(0).toUpperCase()}
+              {message.sender_username.charAt(0).toUpperCase()}
             </div>
           ) : (
             <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity leading-[40px]">
@@ -133,25 +137,22 @@ function MessageComponent({
                 className="font-semibold text-sm hover:underline cursor-pointer"
                 style={{ color: roleColor }}
               >
-                {message.author.username}
+                {message.sender_username}
               </span>
               <span className="text-xs text-muted-foreground">
                 {formatTime(message.timestamp)}
               </span>
-              {message.edited && (
+              {message.is_edited && (
                 <span className="text-[10px] text-muted-foreground">(edited)</span>
               )}
             </div>
           )}
 
           {/* Reply reference */}
-          {message.replyTo && (
+          {message.reply_to && (
             <div className="flex items-center gap-2 mb-1 text-xs text-muted-foreground">
               <div className="w-8 h-4 border-l-2 border-t-2 border-muted-foreground/30 rounded-tl-md ml-1" />
-              <span className="font-medium" style={{ color: getUserRoleColor(message.replyTo.author) }}>
-                {message.replyTo.author.username}
-              </span>
-              <span className="truncate max-w-[300px] opacity-70">{message.replyTo.content}</span>
+              <span className="truncate max-w-[300px] opacity-70">Replying to a message</span>
             </div>
           )}
 
@@ -160,56 +161,15 @@ function MessageComponent({
             <p className="text-foreground leading-relaxed break-words">{message.content}</p>
           )}
 
-          {/* Image attachment */}
-          {message.image && (
-            <div className="mt-2 max-w-md">
-              <div className="rounded-xl overflow-hidden border border-border/50 bg-gradient-to-br from-primary/20 via-accent/20 to-primary/10 h-48 flex items-center justify-center">
-                <ImageIcon className="w-12 h-12 text-muted-foreground/50" />
-              </div>
-            </div>
-          )}
+          {/* TODO: Render attachments and embeds from separate store */}
 
-          {/* File attachment */}
-          {message.file && (
-            <div className="mt-2 inline-flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/50 border border-border/50">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <ImageIcon className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{message.file.name}</p>
-                <p className="text-xs text-muted-foreground">{message.file.size}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Reactions */}
-          {message.reactions && message.reactions.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {message.reactions.map((reaction, i) => (
-                <button
-                  key={i}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-sm transition-all",
-                    reaction.reacted
-                      ? "bg-primary/20 border border-primary/40 text-primary"
-                      : "bg-secondary/50 border border-transparent hover:border-border text-foreground"
-                  )}
-                >
-                  <span>{reaction.emoji}</span>
-                  <span className="text-xs font-medium">{reaction.count}</span>
-                </button>
-              ))}
-              <button className="w-7 h-7 rounded-lg bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors">
-                <Smile className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-          )}
+          {/* TODO: Wire reactions from reaction store */}
 
           {/* Thread link */}
-          {message.threadCount && message.threadCount > 0 && (
+          {message.thread_reply_count > 0 && (
             <button className="mt-2 flex items-center gap-2 text-sm text-primary hover:underline">
               <MessageSquare className="w-4 h-4" />
-              <span>{message.threadCount} replies</span>
+              <span>{message.thread_reply_count} replies</span>
             </button>
           )}
         </div>
@@ -219,40 +179,48 @@ function MessageComponent({
 }
 
 export function MessageFeed({ channelId, showMembers, onToggleMembers }: MessageFeedProps) {
-  const channel = mockChannels.find(c => c.id === channelId)
+  const { channels, activeHallId } = useHallStore()
+  const { messages: storeMessages, sendMessage } = useMessageStore()
+  const channel = channels.find(c => c.id === channelId)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [inputValue, setInputValue] = useState("")
 
-  // Group messages by date and consecutive author
-  const groupedMessages: { date: string; messages: { message: Message; isGrouped: boolean }[] }[] = []
-  
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [storeMessages.length])
+
+  // Group messages by date and consecutive sender (5-min window)
+  const groupedMessages: { date: string; messages: { message: MessageType; isGrouped: boolean }[] }[] = []
+
   let currentDate = ""
-  let lastAuthorId = ""
+  let lastSenderId = ""
   let lastTimestamp: Date | null = null
 
-  mockMessages.forEach((msg) => {
-    const msgDate = formatDate(msg.timestamp)
-    
+  storeMessages.forEach((msg) => {
+    const msgDate = formatDate(new Date(msg.timestamp))
+
     if (msgDate !== currentDate) {
       currentDate = msgDate
       groupedMessages.push({ date: msgDate, messages: [] })
-      lastAuthorId = ""
+      lastSenderId = ""
       lastTimestamp = null
     }
 
-    const timeDiff = lastTimestamp 
-      ? (msg.timestamp.getTime() - lastTimestamp.getTime()) / 1000 / 60 
+    const msgTime = new Date(msg.timestamp)
+    const timeDiff = lastTimestamp
+      ? (msgTime.getTime() - lastTimestamp.getTime()) / 1000 / 60
       : Infinity
 
-    const isGrouped = msg.author.id === lastAuthorId && timeDiff < 5 && !msg.replyTo
+    const isGrouped = msg.sender_id === lastSenderId && timeDiff < 5 && !msg.reply_to
 
     groupedMessages[groupedMessages.length - 1].messages.push({
       message: msg,
       isGrouped,
     })
 
-    lastAuthorId = msg.author.id
-    lastTimestamp = msg.timestamp
+    lastSenderId = msg.sender_id
+    lastTimestamp = msgTime
   })
 
   return (
@@ -361,8 +329,10 @@ export function MessageFeed({ channelId, showMembers, onToggleMembers }: Message
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
-                  // Send message logic
-                  setInputValue("")
+                  if (inputValue.trim() && activeHallId && channelId) {
+                    sendMessage(activeHallId, channelId, inputValue.trim())
+                    setInputValue("")
+                  }
                 }
               }}
             />
