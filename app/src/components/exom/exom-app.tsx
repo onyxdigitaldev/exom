@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react"
+import { useEffect, useState } from "react"
 import { TopNavigation } from "./top-navigation"
 import { ChannelPanel } from "./channel-panel"
 import { MessageFeed } from "./message-feed"
@@ -15,12 +15,7 @@ import { useHallStore } from "@/stores/hallStore"
 import { useMessageStore } from "@/stores/messageStore"
 import { useMemberStore } from "@/stores/memberStore"
 import { useUiStore } from "@/stores/uiStore"
-import { usePresenceStore } from "@/stores/presenceStore"
-import { useReactionStore } from "@/stores/reactionStore"
-import { useWebSocket, type RelayEvent } from "@/hooks/useWebSocket"
-import { useVoice } from "@/hooks/useVoice"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
-import { showNotification } from "@/lib/electron"
 
 export function ExomApp() {
   const [showCommandPalette, setShowCommandPalette] = useState(false)
@@ -29,120 +24,25 @@ export function ExomApp() {
   })
 
   const { isAuthenticated, user } = useAuthStore()
-  const { halls, activeHallId, activeChannelId, loadHalls, selectHall, selectChannel } = useHallStore()
-  const { loadMessages, addMessage, updateMessage, removeMessage } = useMessageStore()
-  const { loadMembers, setOnline, setOffline } = useMemberStore()
+  const { activeHallId, activeChannelId, loadHalls, selectHall, selectChannel } = useHallStore()
+  const { loadMessages } = useMessageStore()
+  const { loadMembers } = useMemberStore()
   const ui = useUiStore()
-  const voice = useVoice()
-  const presence = usePresenceStore()
-  const { invalidate: invalidateReactions } = useReactionStore()
 
-  /** Dispatch incoming relay events to the appropriate stores. */
-  const handleRelayEvent = useCallback((event: RelayEvent) => {
-    switch (event.type) {
-      case 'ChannelMessage': {
-        const { sender_id, message } = event as RelayEvent & {
-          sender_id: string
-          message: { id: string; content: string; timestamp: string; reply_to?: string }
-        }
-        addMessage({
-          id: message.id,
-          sender_id,
-          sender_username: '',
-          sender_role: 'Agent',
-          content: message.content,
-          timestamp: message.timestamp,
-          is_edited: false,
-          reply_to: message.reply_to ?? null,
-          thread_id: null,
-          is_pinned: false,
-          reaction_count: 0,
-          thread_reply_count: 0,
-        })
-        // Desktop notification when window is not focused
-        if (sender_id !== user?.user_id && !document.hasFocus()) {
-          showNotification('New message', message.content.slice(0, 100))
-        }
-        break
-      }
-      case 'MessageEdited': {
-        const { message_id, new_content, edited_at } = event as RelayEvent & {
-          message_id: string; new_content: string; edited_at: string
-        }
-        updateMessage(message_id, new_content, edited_at)
-        break
-      }
-      case 'MessageDeleted': {
-        const { message_id } = event as RelayEvent & { message_id: string }
-        removeMessage(message_id)
-        break
-      }
-      case 'MemberOnline': {
-        const { user_id } = event as RelayEvent & { user_id: string }
-        setOnline(user_id)
-        break
-      }
-      case 'MemberOffline': {
-        const { user_id } = event as RelayEvent & { user_id: string }
-        setOffline(user_id)
-        break
-      }
-      case 'TypingStarted': {
-        const { channel_id, user_id } = event as RelayEvent & { channel_id: string; user_id: string }
-        presence.setTyping(channel_id, user_id)
-        break
-      }
-      case 'PresenceUpdated': {
-        const { user_id, status } = event as RelayEvent & { user_id: string; status: number }
-        presence.setStatus(user_id, status)
-        break
-      }
-      case 'ReactionAdded':
-      case 'ReactionRemoved': {
-        const { message_id } = event as RelayEvent & { message_id: string }
-        invalidateReactions(message_id)
-        break
-      }
-      // Voice signaling — delegate to useVoice hook
-      case 'VoiceUserJoined':
-      case 'VoiceUserLeft':
-      case 'VoiceOffer':
-      case 'VoiceAnswer':
-      case 'VoiceIceCandidate':
-      case 'VoiceStateUpdated': {
-        voice.handleVoiceEvent(event)
-        break
-      }
-    }
-  }, [addMessage, updateMessage, removeMessage, setOnline, setOffline, presence, voice, invalidateReactions, activeHallId, activeChannelId, loadMessages])
-
-  const { connect, send, state: wsState } = useWebSocket({
-    onEvent: handleRelayEvent,
-  })
-
-  // Re-subscribe to active hall on reconnect
-  useEffect(() => {
-    if (wsState === 'connected' && activeHallId) {
-      send({ HallJoin: { hall_id: activeHallId } })
-    }
-  }, [wsState, activeHallId, send])
-
-  // Load halls on auth
+  // Load halls after authentication
   useEffect(() => {
     if (isAuthenticated) {
       loadHalls()
-      connect()
     }
-  }, [isAuthenticated, loadHalls, connect])
+  }, [isAuthenticated, loadHalls])
 
-  // Load channel messages and members when hall/channel changes
+  // Load channel data when hall/channel selection changes
   useEffect(() => {
     if (activeHallId && activeChannelId) {
       loadMessages(activeHallId, activeChannelId)
       loadMembers(activeHallId)
-      send({ HallJoin: { hall_id: activeHallId } })
     }
-  }, [activeHallId, activeChannelId, loadMessages, loadMembers, send])
+  }, [activeHallId, activeChannelId, loadMessages, loadMembers])
 
   if (!isAuthenticated) {
     return <AuthScreen onLogin={() => {}} />
@@ -182,7 +82,6 @@ export function ExomApp() {
                 onInvite={() => ui.setShowInvite(true)}
                 onHallSettings={() => ui.setShowHallSettings(true)}
                 onCreateChannel={() => ui.setShowCreateChannel(true)}
-                voice={voice}
               />
             </div>
 
