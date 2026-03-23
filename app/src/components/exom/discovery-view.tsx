@@ -1,19 +1,21 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { cn } from "@/lib/utils"
-import { 
-  Search, 
-  Compass, 
-  TrendingUp, 
-  Gamepad2, 
-  Music, 
-  Palette, 
+import {
+  Search,
+  Compass,
+  TrendingUp,
+  Gamepad2,
+  Music,
+  Palette,
   GraduationCap,
   Users,
   Plus,
   X,
   Upload
 } from "lucide-react"
-import { discoveryHalls } from "@/lib/mock-data"
+import { discovery as discoveryApi } from "@/lib/api"
+import { useHallStore } from "@/stores/hallStore"
+import type { DiscoveryHall } from "@/lib/types"
 
 interface DiscoveryViewProps {
   onClose: () => void
@@ -33,13 +35,52 @@ export function DiscoveryView({ onClose, onJoinHall }: DiscoveryViewProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [discoveryHalls, setDiscoveryHalls] = useState<DiscoveryHall[]>([])
+  const [loading, setLoading] = useState(false)
+  const [newHallName, setNewHallName] = useState("")
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
-  const filteredHalls = discoveryHalls.filter(hall => {
-    if (searchQuery && !hall.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false
+  const { createHall, selectHall } = useHallStore()
+
+  const fetchHalls = useCallback(async (query?: string, category?: string) => {
+    setLoading(true)
+    try {
+      const cat = category === "all" ? undefined : category
+      const halls = await discoveryApi.search(query || undefined, cat)
+      setDiscoveryHalls(halls)
+    } catch {
+      // Degrade gracefully — show empty results
+    } finally {
+      setLoading(false)
     }
-    return true
-  })
+  }, [])
+
+  // Initial load + category changes
+  useEffect(() => {
+    fetchHalls(searchQuery || undefined, activeCategory)
+  }, [activeCategory, fetchHalls]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced search
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      fetchHalls(value || undefined, activeCategory)
+    }, 300)
+  }
+
+  const handleCreateHall = async () => {
+    if (!newHallName.trim()) return
+    try {
+      const hall = await createHall(newHallName.trim())
+      setShowCreateModal(false)
+      setNewHallName("")
+      onClose()
+      await selectHall(hall.id)
+    } catch {
+      // TODO: Surface error to user via toast
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -80,7 +121,7 @@ export function DiscoveryView({ onClose, onJoinHall }: DiscoveryViewProps) {
               type="text"
               placeholder="Search for Halls..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full h-12 pl-12 pr-4 rounded-2xl bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition-all"
             />
           </div>
@@ -109,50 +150,56 @@ export function DiscoveryView({ onClose, onJoinHall }: DiscoveryViewProps) {
 
         {/* Hall Grid */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredHalls.map(hall => (
-              <div
-                key={hall.id}
-                className="group relative rounded-2xl border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-all overflow-hidden"
-              >
-                {/* Banner */}
-                <div 
-                  className="h-24 w-full"
-                  style={{ 
-                    background: `linear-gradient(135deg, ${hall.color}40, ${hall.color}80)` 
-                  }}
-                />
-                
-                {/* Content */}
-                <div className="p-4 -mt-8 relative">
-                  <div 
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg border-4 border-card"
-                    style={{ backgroundColor: hall.color }}
-                  >
-                    {hall.name.charAt(0)}
-                  </div>
-                  
-                  <div className="mt-3">
-                    <h3 className="font-semibold text-foreground text-lg">{hall.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{hall.description}</p>
-                  </div>
+          {loading && discoveryHalls.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">Searching...</p>
+            </div>
+          ) : discoveryHalls.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No halls found. Try a different search or category.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {discoveryHalls.map(hall => (
+                <div
+                  key={hall.hall_id}
+                  className="group relative rounded-2xl border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-all overflow-hidden"
+                >
+                  {/* Banner */}
+                  <div
+                    className="h-24 w-full bg-gradient-to-br from-primary/30 to-accent/30"
+                  />
 
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Users className="w-4 h-4" />
-                      <span>{hall.memberCount?.toLocaleString()} members</span>
-                    </div>
-                    <button
-                      onClick={() => onJoinHall?.(hall.id)}
-                      className="px-4 py-2 rounded-xl bg-primary/10 text-primary font-medium text-sm hover:bg-primary hover:text-primary-foreground transition-all"
+                  {/* Content */}
+                  <div className="p-4 -mt-8 relative">
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg border-4 border-card bg-primary"
                     >
-                      Join
-                    </button>
+                      {hall.name.charAt(0)}
+                    </div>
+
+                    <div className="mt-3">
+                      <h3 className="font-semibold text-foreground text-lg">{hall.name}</h3>
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{hall.description}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-4">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Users className="w-4 h-4" />
+                        <span>{hall.member_count.toLocaleString()} members</span>
+                      </div>
+                      <button
+                        onClick={() => onJoinHall?.(hall.hall_id)}
+                        className="px-4 py-2 rounded-xl bg-primary/10 text-primary font-medium text-sm hover:bg-primary hover:text-primary-foreground transition-all"
+                      >
+                        Join
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Create Hall Modal */}
@@ -163,7 +210,7 @@ export function DiscoveryView({ onClose, onJoinHall }: DiscoveryViewProps) {
                 <h3 className="text-xl font-bold text-foreground">Create Your Hall</h3>
                 <p className="text-sm text-muted-foreground mt-1">Give your new community a personality</p>
               </div>
-              
+
               <div className="p-6 space-y-6">
                 {/* Icon Upload */}
                 <div className="flex items-center gap-4">
@@ -183,6 +230,8 @@ export function DiscoveryView({ onClose, onJoinHall }: DiscoveryViewProps) {
                   <input
                     type="text"
                     placeholder="My Awesome Hall"
+                    value={newHallName}
+                    onChange={(e) => setNewHallName(e.target.value)}
                     className="w-full h-11 px-4 rounded-xl bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                   />
                 </div>
@@ -210,7 +259,11 @@ export function DiscoveryView({ onClose, onJoinHall }: DiscoveryViewProps) {
                 >
                   Cancel
                 </button>
-                <button className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all">
+                <button
+                  onClick={handleCreateHall}
+                  disabled={!newHallName.trim()}
+                  className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Create Hall
                 </button>
               </div>

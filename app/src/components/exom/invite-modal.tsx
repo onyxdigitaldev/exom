@@ -1,33 +1,83 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
-import { 
-  X, 
-  Copy, 
+import {
+  X,
+  Copy,
   Check,
   ChevronDown,
   Clock,
   Users
 } from "lucide-react"
-import { mockHalls, mockUsers } from "@/lib/mock-data"
+import { useHallStore } from "@/stores/hallStore"
+import { useMemberStore } from "@/stores/memberStore"
+import { invites as invitesApi } from "@/lib/api"
 
 interface InviteModalProps {
   hallId: string
   onClose: () => void
 }
 
+/** Map expiry label to hours for the API. */
+const expiryToHours: Record<string, number | undefined> = {
+  "30 minutes": 0.5,
+  "1 hour": 1,
+  "6 hours": 6,
+  "12 hours": 12,
+  "1 day": 24,
+  "7 days": 168,
+  "Never": undefined,
+}
+
+/** Map max-uses label to the numeric value for the API. */
+const maxUsesToNumber: Record<string, number | undefined> = {
+  "No limit": undefined,
+  "1 use": 1,
+  "5 uses": 5,
+  "10 uses": 10,
+  "25 uses": 25,
+  "50 uses": 50,
+  "100 uses": 100,
+}
+
 export function InviteModal({ hallId, onClose }: InviteModalProps) {
-  const hall = mockHalls.find(h => h.id === hallId)
+  const { halls } = useHallStore()
+  const { members } = useMemberStore()
+  const hall = halls.find(h => h.id === hallId)
+
   const [copied, setCopied] = useState(false)
   const [showExpiry, setShowExpiry] = useState(false)
   const [expiry, setExpiry] = useState("7 days")
   const [maxUses, setMaxUses] = useState("No limit")
+  const [inviteLink, setInviteLink] = useState("")
+  const [generating, setGenerating] = useState(false)
 
-  const inviteLink = `exom.app/invite/Abc123Xyz`
+  const generateInvite = useCallback(async (expiryLabel?: string, maxUsesLabel?: string) => {
+    setGenerating(true)
+    try {
+      const hours = expiryToHours[expiryLabel ?? expiry]
+      const uses = maxUsesToNumber[maxUsesLabel ?? maxUses]
+      const invite = await invitesApi.create(hallId, undefined, hours, uses)
+      setInviteLink(`exom.app/invite/${invite.token}`)
+    } catch {
+      setInviteLink("Failed to generate invite")
+    } finally {
+      setGenerating(false)
+    }
+  }, [hallId, expiry, maxUses])
+
+  // Generate an invite on mount
+  useEffect(() => {
+    generateInvite()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleGenerateNew = () => {
+    generateInvite(expiry, maxUses)
   }
 
   return (
@@ -56,15 +106,19 @@ export function InviteModal({ hallId, onClose }: InviteModalProps) {
             </label>
             <div className="flex items-center gap-2">
               <div className="flex-1 h-11 px-4 rounded-xl bg-secondary/50 border border-border/50 flex items-center">
-                <span className="text-foreground text-sm truncate">{inviteLink}</span>
+                <span className="text-foreground text-sm truncate">
+                  {generating ? "Generating..." : inviteLink}
+                </span>
               </div>
               <button
                 onClick={handleCopy}
+                disabled={generating || !inviteLink}
                 className={cn(
                   "h-11 px-5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all",
                   copied
                     ? "bg-online text-white"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                  (generating || !inviteLink) && "opacity-50 cursor-not-allowed"
                 )}
               >
                 {copied ? (
@@ -99,7 +153,7 @@ export function InviteModal({ hallId, onClose }: InviteModalProps) {
                   <Clock className="w-4 h-4 text-muted-foreground" />
                   Expire After
                 </label>
-                <select 
+                <select
                   value={expiry}
                   onChange={(e) => setExpiry(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -118,7 +172,7 @@ export function InviteModal({ hallId, onClose }: InviteModalProps) {
                   <Users className="w-4 h-4 text-muted-foreground" />
                   Max Uses
                 </label>
-                <select 
+                <select
                   value={maxUses}
                   onChange={(e) => setMaxUses(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -132,7 +186,11 @@ export function InviteModal({ hallId, onClose }: InviteModalProps) {
                   <option>100 uses</option>
                 </select>
               </div>
-              <button className="w-full h-10 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-all">
+              <button
+                onClick={handleGenerateNew}
+                disabled={generating}
+                className="w-full h-10 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-all disabled:opacity-50"
+              >
                 Generate New Link
               </button>
             </div>
@@ -144,24 +202,21 @@ export function InviteModal({ hallId, onClose }: InviteModalProps) {
               Or send invite to a friend
             </label>
             <div className="space-y-1 max-h-40 overflow-y-auto">
-              {mockUsers.slice(0, 5).map(user => (
+              {members.slice(0, 5).map(member => (
                 <div
-                  key={user.id}
+                  key={member.user_id}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
                 >
                   <div className="relative">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center text-white text-sm font-medium">
-                      {user.username.charAt(0).toUpperCase()}
+                      {member.username.charAt(0).toUpperCase()}
                     </div>
                     <span className={cn(
                       "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card",
-                      user.status === "online" && "bg-online",
-                      user.status === "idle" && "bg-idle",
-                      user.status === "dnd" && "bg-dnd",
-                      user.status === "offline" && "bg-offline"
+                      member.is_online ? "bg-online" : "bg-offline"
                     )} />
                   </div>
-                  <span className="flex-1 text-sm text-foreground">{user.username}</span>
+                  <span className="flex-1 text-sm text-foreground">{member.username}</span>
                   <button className="px-3 py-1 rounded-md bg-secondary/50 text-xs text-foreground hover:bg-secondary transition-colors">
                     Invite
                   </button>

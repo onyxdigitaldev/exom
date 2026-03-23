@@ -14,6 +14,8 @@ import { useHallStore } from "@/stores/hallStore"
 import { useMessageStore } from "@/stores/messageStore"
 import { useMemberStore } from "@/stores/memberStore"
 import { useUiStore } from "@/stores/uiStore"
+import { useVoiceStore } from "@/stores/voiceStore"
+import { usePresenceStore } from "@/stores/presenceStore"
 import { useWebSocket, type RelayEvent } from "@/hooks/useWebSocket"
 
 export function ExomApp() {
@@ -22,25 +24,26 @@ export function ExomApp() {
   const { loadMessages, addMessage, updateMessage, removeMessage } = useMessageStore()
   const { loadMembers, setOnline, setOffline } = useMemberStore()
   const ui = useUiStore()
+  const voice = useVoiceStore()
+  const presence = usePresenceStore()
 
-  // Handle incoming relay events and dispatch to stores
+  /** Dispatch incoming relay events to the appropriate stores. */
   const handleRelayEvent = useCallback((event: RelayEvent) => {
     switch (event.type) {
       case 'ChannelMessage': {
-        const msg = event as RelayEvent & {
+        const { sender_id, message } = event as RelayEvent & {
           sender_id: string
-          message: { id: string; content: string; timestamp: string }
+          message: { id: string; content: string; timestamp: string; reply_to?: string }
         }
-        // Only add if it's for the active channel
         addMessage({
-          id: msg.message.id,
-          sender_id: msg.sender_id,
-          sender_username: '', // Will be resolved on next load
+          id: message.id,
+          sender_id,
+          sender_username: '',
           sender_role: 'Agent',
-          content: msg.message.content,
-          timestamp: msg.message.timestamp,
+          content: message.content,
+          timestamp: message.timestamp,
           is_edited: false,
-          reply_to: null,
+          reply_to: message.reply_to ?? null,
           thread_id: null,
           is_pinned: false,
           reaction_count: 0,
@@ -49,33 +52,66 @@ export function ExomApp() {
         break
       }
       case 'MessageEdited': {
-        const edit = event as RelayEvent & { message_id: string; new_content: string; edited_at: string }
-        updateMessage(edit.message_id, edit.new_content, edit.edited_at)
+        const { message_id, new_content, edited_at } = event as RelayEvent & {
+          message_id: string; new_content: string; edited_at: string
+        }
+        updateMessage(message_id, new_content, edited_at)
         break
       }
       case 'MessageDeleted': {
-        const del = event as RelayEvent & { message_id: string }
-        removeMessage(del.message_id)
+        const { message_id } = event as RelayEvent & { message_id: string }
+        removeMessage(message_id)
         break
       }
       case 'MemberOnline': {
-        const online = event as RelayEvent & { user_id: string }
-        setOnline(online.user_id)
+        const { user_id } = event as RelayEvent & { user_id: string }
+        setOnline(user_id)
         break
       }
       case 'MemberOffline': {
-        const offline = event as RelayEvent & { user_id: string }
-        setOffline(offline.user_id)
+        const { user_id } = event as RelayEvent & { user_id: string }
+        setOffline(user_id)
         break
       }
       case 'TypingStarted': {
-        const typing = event as RelayEvent & { user_id: string }
-        // Typing indicator handled via uiStore
-        // Would need username lookup — simplified for now
+        const { channel_id, user_id } = event as RelayEvent & { channel_id: string; user_id: string }
+        presence.setTyping(channel_id, user_id)
+        break
+      }
+      case 'PresenceUpdated': {
+        const { user_id, status } = event as RelayEvent & { user_id: string; status: number }
+        presence.setStatus(user_id, status)
+        break
+      }
+      case 'ReactionAdded':
+      case 'ReactionRemoved': {
+        // Reload messages to reflect reaction changes
+        if (activeHallId && activeChannelId) {
+          loadMessages(activeHallId, activeChannelId)
+        }
+        break
+      }
+      case 'VoiceUserJoined': {
+        const { channel_id, user_id } = event as RelayEvent & { channel_id: string; user_id: string }
+        voice.addUser(channel_id, {
+          user_id, username: '', self_mute: false, self_deaf: false, video: false, streaming: false,
+        })
+        break
+      }
+      case 'VoiceUserLeft': {
+        const { channel_id, user_id } = event as RelayEvent & { channel_id: string; user_id: string }
+        voice.removeUser(channel_id, user_id)
+        break
+      }
+      case 'VoiceStateUpdated': {
+        const { channel_id, user_id, self_mute, self_deaf, video, streaming } = event as RelayEvent & {
+          channel_id: string; user_id: string; self_mute: boolean; self_deaf: boolean; video: boolean; streaming: boolean
+        }
+        voice.updateUser(channel_id, user_id, { self_mute, self_deaf, video, streaming })
         break
       }
     }
-  }, [addMessage, updateMessage, removeMessage, setOnline, setOffline])
+  }, [addMessage, updateMessage, removeMessage, setOnline, setOffline, presence, voice, activeHallId, activeChannelId, loadMessages])
 
   const { connect, send, state: wsState } = useWebSocket({
     onEvent: handleRelayEvent,

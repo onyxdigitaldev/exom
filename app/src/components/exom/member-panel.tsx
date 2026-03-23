@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { roleConfig, type Role } from "@/lib/mock-data"
+import { roleConfig, type RoleKey } from "@/lib/constants"
 import { Search } from "lucide-react"
 import { useMemberStore } from "@/stores/memberStore"
 import type { Member } from "@/lib/types"
@@ -12,7 +12,7 @@ export function MemberPanel({ onMemberClick }: MemberPanelProps) {
   const { members } = useMemberStore()
 
   // Group members by role
-  const membersByRole: Record<Role, Member[]> = {
+  const membersByRole: Record<RoleKey, Member[]> = {
     builder: [],
     prefect: [],
     moderator: [],
@@ -21,7 +21,7 @@ export function MemberPanel({ onMemberClick }: MemberPanelProps) {
   }
 
   members.forEach(member => {
-    const key = member.role.toLowerCase() as Role
+    const key = member.role.toLowerCase() as RoleKey
     if (membersByRole[key]) {
       membersByRole[key].push(member)
     } else {
@@ -29,7 +29,7 @@ export function MemberPanel({ onMemberClick }: MemberPanelProps) {
     }
   })
 
-  const roleOrder: Role[] = ['builder', 'prefect', 'moderator', 'agent', 'fellow']
+  const roleOrder: RoleKey[] = ['builder', 'prefect', 'moderator', 'agent', 'fellow']
 
   return (
     <div className="w-60 flex flex-col h-full bg-card/30 rounded-2xl m-2 mr-0 ml-0 border border-border/30 overflow-hidden">

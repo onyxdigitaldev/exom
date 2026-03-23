@@ -17,7 +17,7 @@ import {
   MessageSquare,
   ArrowUp
 } from "lucide-react"
-import { roleConfig } from "@/lib/mock-data"
+import { roleConfig } from "@/lib/constants"
 import { useHallStore } from "@/stores/hallStore"
 import { useMessageStore } from "@/stores/messageStore"
 import type { Message as MessageType } from "@/lib/types"

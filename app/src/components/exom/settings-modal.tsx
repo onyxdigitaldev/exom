@@ -1,19 +1,19 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { 
-  X, 
-  User, 
-  Shield, 
-  Bell, 
-  Palette, 
-  Mic, 
-  Keyboard, 
+import {
+  X,
+  User,
+  Shield,
+  Bell,
+  Palette,
+  Mic,
+  Keyboard,
   LogOut,
   ChevronRight,
   Camera,
   Check
 } from "lucide-react"
-import { currentUser } from "@/lib/mock-data"
+import { useAuthStore } from "@/stores/authStore"
 import { Switch } from "@/components/ui/switch"
 
 interface SettingsModalProps {
@@ -34,6 +34,14 @@ const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>("account")
+  const { user, logout } = useAuthStore()
+
+  const displayName = user?.username ?? "Unknown"
+
+  const handleLogout = async () => {
+    await logout()
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex">
@@ -66,7 +74,10 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
           <div className="h-px bg-border/50 my-4" />
 
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-all">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
+          >
             <LogOut className="w-4 h-4" />
             Log Out
           </button>
@@ -94,25 +105,24 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           {activeTab === "account" && (
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">My Account</h2>
-              
+
               {/* Profile Card */}
               <div className="rounded-2xl bg-secondary/30 border border-border/30 overflow-hidden">
                 {/* Banner */}
                 <div className="h-24 bg-gradient-to-r from-primary/50 to-accent/50" />
-                
+
                 <div className="p-6 -mt-12">
                   <div className="flex items-end gap-4">
                     <div className="relative">
                       <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-bold border-4 border-card">
-                        {currentUser.username.charAt(0).toUpperCase()}
+                        {displayName.charAt(0).toUpperCase()}
                       </div>
                       <button className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center hover:bg-secondary/80 transition-colors">
                         <Camera className="w-3.5 h-3.5 text-muted-foreground" />
                       </button>
                     </div>
                     <div className="flex-1 pb-1">
-                      <h3 className="text-xl font-bold text-foreground">{currentUser.username}</h3>
-                      <p className="text-sm text-muted-foreground">#{currentUser.discriminator}</p>
+                      <h3 className="text-xl font-bold text-foreground">{displayName}</h3>
                     </div>
                     <button className="px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-all">
                       Edit Profile
@@ -123,7 +133,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                     <div className="flex items-center justify-between py-3 border-b border-border/30">
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wide">Username</p>
-                        <p className="text-foreground mt-0.5">{currentUser.username}#{currentUser.discriminator}</p>
+                        <p className="text-foreground mt-0.5">{displayName}</p>
                       </div>
                       <button className="px-3 py-1.5 rounded-lg bg-secondary/50 text-sm text-foreground hover:bg-secondary transition-colors">
                         Edit
@@ -176,7 +186,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           {activeTab === "appearance" && (
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">Appearance</h2>
-              
+
               <div className="space-y-6">
                 <div>
                   <h3 className="text-sm font-medium text-foreground mb-3">Theme</h3>
@@ -236,7 +246,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           {activeTab === "notifications" && (
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">Notifications</h2>
-              
+
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
