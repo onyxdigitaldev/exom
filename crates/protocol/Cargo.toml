@@ -1,0 +1,12 @@
+[package]
+name = "exom-protocol"
+version.workspace = true
+edition = "2021"
+
+[dependencies]
+uuid = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rmp-serde = { workspace = true }
+thiserror = { workspace = true }

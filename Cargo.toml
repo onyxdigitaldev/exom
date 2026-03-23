@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "crates/core",
+    "crates/protocol",
+    "crates/relay",
     "crates/app",
 ]
 
@@ -27,8 +29,20 @@ directories = "5.0"
 # UI dependencies
 slint = "1.9"
 
-# Async runtime (for future networking)
+# Async runtime
 tokio = { version = "1.42", features = ["full"] }
+
+# Networking
+axum = { version = "0.7", features = ["ws"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+
+# Serialization (wire format)
+rmp-serde = "1.3"
+
+# Crypto
+hmac = "0.12"
+sha2 = "0.10"
 
 # Logging
 tracing = "0.1"

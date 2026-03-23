@@ -21,7 +21,8 @@ pub fn setup_chat_bindings(window: &MainWindow, state: Arc<AppState>) {
         };
 
         let db = state_load.db.lock().unwrap();
-        let messages = match db.messages().list_for_hall(hall_id, 100, None) {
+        // TODO: Use actual channel_id once UI supports channels. Using hall_id as placeholder.
+        let messages = match db.messages().list_for_channel(hall_id, 100, None) {
             Ok(m) => m,
             Err(_) => return,
         };
@@ -93,7 +94,8 @@ pub fn setup_chat_bindings(window: &MainWindow, state: Arc<AppState>) {
             None => return,
         };
 
-        let message = Message::new(hall_id, user_id, content);
+        // TODO: Use actual channel_id once UI supports channels. Using hall_id as placeholder.
+        let message = Message::new(hall_id, hall_id, user_id, content);
 
         let db = state_send.db.lock().unwrap();
         if db.messages().create(&message).is_err() {
