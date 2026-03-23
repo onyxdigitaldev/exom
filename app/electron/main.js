@@ -160,16 +160,21 @@ async function createWindow() {
     },
   })
 
-  // Content Security Policy — restrict what the renderer can load
+  // Content Security Policy — only apply when serving via HTTP (not file://)
+  // file:// + CSP 'self' is unreliable across platforms
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    if (details.url.startsWith('file://')) {
+      callback({ responseHeaders: details.responseHeaders })
+      return
+    }
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'",   // Vite HMR needs inline in dev
-            "style-src 'self' 'unsafe-inline'",     // Tailwind needs inline styles
+            "script-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: http://localhost:*",
             "font-src 'self' data:",
             "connect-src 'self' http://localhost:* ws://localhost:*",
@@ -196,6 +201,9 @@ async function createWindow() {
   // Show when ready to prevent flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
+    if (isDev) {
+      mainWindow.webContents.openDevTools()
+    }
   })
 
   // Load the frontend — try Vite dev server first, fall back to built files
