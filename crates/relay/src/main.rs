@@ -80,8 +80,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/ws", get(ws_handler))
-        .route("/upload/{filename}", put(files::upload_file))
-        .route("/files/{hash}/{filename}", get(files::download_file))
+        .route("/upload/:filename", put(files::upload_file))
+        .route("/files/:hash/:filename", get(files::download_file))
         .route("/health", get(health))
         .with_state(state);
 
