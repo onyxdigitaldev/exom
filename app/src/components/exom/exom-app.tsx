@@ -16,6 +16,7 @@ import { useMemberStore } from "@/stores/memberStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useVoiceStore } from "@/stores/voiceStore"
 import { usePresenceStore } from "@/stores/presenceStore"
+import { useReactionStore } from "@/stores/reactionStore"
 import { useWebSocket, type RelayEvent } from "@/hooks/useWebSocket"
 
 export function ExomApp() {
@@ -26,6 +27,7 @@ export function ExomApp() {
   const ui = useUiStore()
   const voice = useVoiceStore()
   const presence = usePresenceStore()
+  const { invalidate: invalidateReactions } = useReactionStore()
 
   /** Dispatch incoming relay events to the appropriate stores. */
   const handleRelayEvent = useCallback((event: RelayEvent) => {
@@ -85,10 +87,8 @@ export function ExomApp() {
       }
       case 'ReactionAdded':
       case 'ReactionRemoved': {
-        // Reload messages to reflect reaction changes
-        if (activeHallId && activeChannelId) {
-          loadMessages(activeHallId, activeChannelId)
-        }
+        const { message_id } = event as RelayEvent & { message_id: string }
+        invalidateReactions(message_id)
         break
       }
       case 'VoiceUserJoined': {
@@ -111,10 +111,18 @@ export function ExomApp() {
         break
       }
     }
-  }, [addMessage, updateMessage, removeMessage, setOnline, setOffline, presence, voice, activeHallId, activeChannelId, loadMessages])
+  }, [addMessage, updateMessage, removeMessage, setOnline, setOffline, presence, voice, invalidateReactions, activeHallId, activeChannelId, loadMessages])
+
+  // Re-subscribe to active hall on reconnect
+  const handleWsStateChange = useCallback((state: string) => {
+    if (state === 'connected' && activeHallId) {
+      send({ HallJoin: { hall_id: activeHallId } })
+    }
+  }, [activeHallId, send])
 
   const { connect, send, state: wsState } = useWebSocket({
     onEvent: handleRelayEvent,
+    onStateChange: handleWsStateChange,
   })
 
   // Load halls on auth
@@ -130,8 +138,6 @@ export function ExomApp() {
     if (activeHallId && activeChannelId) {
       loadMessages(activeHallId, activeChannelId)
       loadMembers(activeHallId)
-
-      // Subscribe to hall events on relay
       send({ HallJoin: { hall_id: activeHallId } })
     }
   }, [activeHallId, activeChannelId, loadMessages, loadMembers, send])
