@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react"
+import { useEffect, useCallback, useState } from "react"
 import { TopNavigation } from "./top-navigation"
 import { ChannelPanel } from "./channel-panel"
 import { MessageFeed } from "./message-feed"
@@ -8,6 +8,7 @@ import { DiscoveryView } from "./discovery-view"
 import { SettingsModal } from "./settings-modal"
 import { InviteModal } from "./invite-modal"
 import { AuthScreen } from "./auth-screen"
+import { CommandPalette, type PaletteAction } from "./command-palette"
 
 import { useAuthStore } from "@/stores/authStore"
 import { useHallStore } from "@/stores/hallStore"
@@ -18,8 +19,15 @@ import { usePresenceStore } from "@/stores/presenceStore"
 import { useReactionStore } from "@/stores/reactionStore"
 import { useWebSocket, type RelayEvent } from "@/hooks/useWebSocket"
 import { useVoice } from "@/hooks/useVoice"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
+import { showNotification } from "@/lib/electron"
 
 export function ExomApp() {
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
+  useKeyboardShortcuts({
+    onCommandPalette: () => setShowCommandPalette((v) => !v),
+  })
+
   const { isAuthenticated, user } = useAuthStore()
   const { halls, activeHallId, activeChannelId, loadHalls, selectHall, selectChannel } = useHallStore()
   const { loadMessages, addMessage, updateMessage, removeMessage } = useMessageStore()
@@ -51,6 +59,10 @@ export function ExomApp() {
           reaction_count: 0,
           thread_reply_count: 0,
         })
+        // Desktop notification when window is not focused
+        if (sender_id !== user?.user_id && !document.hasFocus()) {
+          showNotification('New message', message.content.slice(0, 100))
+        }
         break
       }
       case 'MessageEdited': {
@@ -199,6 +211,25 @@ export function ExomApp() {
       {ui.showInvite && activeHallId && (
         <InviteModal hallId={activeHallId} onClose={() => ui.setShowInvite(false)} />
       )}
+
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        onNavigate={(action) => {
+          switch (action.type) {
+            case 'channel':
+              selectHall(action.hallId)
+              selectChannel(action.channelId)
+              break
+            case 'settings':
+              ui.setShowSettings(true)
+              break
+            case 'discovery':
+              ui.setShowDiscovery(true)
+              break
+          }
+        }}
+      />
     </div>
   )
 }

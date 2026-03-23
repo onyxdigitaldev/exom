@@ -1,9 +1,12 @@
-const { contextBridge } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron')
 
-// Expose a minimal API to the renderer.
-// The frontend communicates with the sidecar via HTTP and the relay via WebSocket,
-// so we only need to expose platform info here.
 contextBridge.exposeInMainWorld('exom', {
   platform: process.platform,
   version: require('../package.json').version,
+
+  /** Show a desktop notification. Clicking it focuses the window. */
+  notify: (title, body) => ipcRenderer.invoke('show-notification', { title, body }),
+
+  /** Set the dock/taskbar unread badge count. */
+  setBadge: (count) => ipcRenderer.invoke('set-badge', count),
 })
