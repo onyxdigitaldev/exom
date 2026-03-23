@@ -106,9 +106,20 @@ async fn main() {
         .with_state(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    info!(port = port, "Exom sidecar listening");
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+            info!(port = port, "Port already in use — sidecar may already be running");
+            std::process::exit(0);
+        }
+        Err(e) => {
+            tracing::error!("Failed to bind port {}: {}", port, e);
+            std::process::exit(1);
+        }
+    };
+
+    info!(port = port, "Exom sidecar listening");
 
     let shutdown = async {
         tokio::signal::ctrl_c().await.ok();

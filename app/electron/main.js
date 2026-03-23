@@ -39,15 +39,41 @@ function saveWindowState() {
 
 // ── Sidecar lifecycle ───────────────────────────
 
-function startSidecar() {
+async function startSidecar() {
   if (sidecarProcess) return
 
+  // Check if sidecar is already running (e.g. started manually)
+  try {
+    const http = require('http')
+    await new Promise((resolve, reject) => {
+      const req = http.get('http://127.0.0.1:9401/health', (res) => {
+        if (res.statusCode === 200) {
+          console.log('[sidecar] Already running on port 9401')
+          resolve()
+        } else {
+          reject()
+        }
+      })
+      req.on('error', reject)
+      req.setTimeout(1000, reject)
+    })
+    return // Already running, don't start another
+  } catch {
+    // Not running, start it
+  }
+
+  // Look for the release binary first, then debug
+  const releasePath = path.join(__dirname, '..', '..', 'target', 'release', 'exom-sidecar')
+  const debugPath = path.join(__dirname, '..', '..', 'target', 'debug', 'exom-sidecar')
+  const prodPath = path.join(process.resourcesPath || '', 'exom-sidecar')
+
   const sidecarPath = isDev
-    ? path.join(__dirname, '..', '..', 'target', 'debug', 'exom-sidecar')
-    : path.join(process.resourcesPath, 'exom-sidecar')
+    ? (fs.existsSync(releasePath) ? releasePath : debugPath)
+    : prodPath
 
   if (!fs.existsSync(sidecarPath)) {
     console.warn('Sidecar binary not found at', sidecarPath)
+    console.warn('Start it manually: cargo run -p exom-sidecar --release')
     return
   }
 
@@ -227,8 +253,8 @@ ipcMain.handle('set-badge', (_, count) => {
 
 // ── App lifecycle ───────────────────────────────
 
-app.whenReady().then(() => {
-  startSidecar()
+app.whenReady().then(async () => {
+  await startSidecar()
   createTray()
   createWindow()
 
