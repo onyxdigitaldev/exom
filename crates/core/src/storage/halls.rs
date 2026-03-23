@@ -19,12 +19,11 @@ impl<'a> HallStore<'a> {
         Self { conn }
     }
 
-    /// Create a new Hall
     #[instrument(skip(self, hall), fields(hall_name = %hall.name))]
     pub fn create(&self, hall: &Hall) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO halls (id, name, description, owner_id, created_at, active_parlor, current_host_id, election_epoch)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO halls (id, name, description, owner_id, created_at, active_parlor, current_host_id, election_epoch, icon_hash, banner_hash, splash_hash)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 hall.id.to_string(),
                 hall.name,
@@ -34,16 +33,18 @@ impl<'a> HallStore<'a> {
                 hall.active_parlor.map(|p| p.0.to_string()),
                 hall.current_host_id.map(|h| h.to_string()),
                 hall.election_epoch,
+                hall.icon_hash,
+                hall.banner_hash,
+                hall.splash_hash,
             ],
         )?;
         Ok(())
     }
 
-    /// Find Hall by ID
     #[instrument(skip(self))]
     pub fn find_by_id(&self, id: Uuid) -> Result<Option<Hall>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, description, owner_id, created_at, active_parlor, current_host_id, election_epoch
+            "SELECT id, name, description, owner_id, created_at, active_parlor, current_host_id, election_epoch, icon_hash, banner_hash, splash_hash
              FROM halls WHERE id = ?1",
         )?;
 
@@ -58,6 +59,9 @@ impl<'a> HallStore<'a> {
                     active_parlor: parse_parlor_id_opt(row.get::<_, Option<String>>(5)?)?,
                     current_host_id: parse_uuid_opt(row.get::<_, Option<String>>(6)?)?,
                     election_epoch: row.get(7)?,
+                    icon_hash: row.get(8)?,
+                    banner_hash: row.get(9)?,
+                    splash_hash: row.get(10)?,
                 })
             })
             .optional()?;
@@ -65,25 +69,26 @@ impl<'a> HallStore<'a> {
         Ok(hall)
     }
 
-    /// Update Hall
     #[instrument(skip(self, hall), fields(hall_id = %hall.id))]
     pub fn update(&self, hall: &Hall) -> Result<()> {
         self.conn.execute(
-            "UPDATE halls SET name = ?1, description = ?2, active_parlor = ?3, current_host_id = ?4, election_epoch = ?5
-             WHERE id = ?6",
+            "UPDATE halls SET name = ?1, description = ?2, active_parlor = ?3, current_host_id = ?4, election_epoch = ?5, icon_hash = ?6, banner_hash = ?7, splash_hash = ?8
+             WHERE id = ?9",
             params![
                 hall.name,
                 hall.description,
                 hall.active_parlor.map(|p| p.0.to_string()),
                 hall.current_host_id.map(|h| h.to_string()),
                 hall.election_epoch,
+                hall.icon_hash,
+                hall.banner_hash,
+                hall.splash_hash,
                 hall.id.to_string(),
             ],
         )?;
         Ok(())
     }
 
-    /// Delete Hall
     #[instrument(skip(self))]
     pub fn delete(&self, hall_id: Uuid) -> Result<()> {
         self.conn.execute(
@@ -93,11 +98,10 @@ impl<'a> HallStore<'a> {
         Ok(())
     }
 
-    /// List all Halls for a user
     #[instrument(skip(self))]
     pub fn list_for_user(&self, user_id: Uuid) -> Result<Vec<Hall>> {
         let mut stmt = self.conn.prepare(
-            "SELECT h.id, h.name, h.description, h.owner_id, h.created_at, h.active_parlor, h.current_host_id, h.election_epoch
+            "SELECT h.id, h.name, h.description, h.owner_id, h.created_at, h.active_parlor, h.current_host_id, h.election_epoch, h.icon_hash, h.banner_hash, h.splash_hash
              FROM halls h
              INNER JOIN memberships m ON m.hall_id = h.id
              WHERE m.user_id = ?1
@@ -115,6 +119,9 @@ impl<'a> HallStore<'a> {
                     active_parlor: parse_parlor_id_opt(row.get::<_, Option<String>>(5)?)?,
                     current_host_id: parse_uuid_opt(row.get::<_, Option<String>>(6)?)?,
                     election_epoch: row.get(7)?,
+                    icon_hash: row.get(8)?,
+                    banner_hash: row.get(9)?,
+                    splash_hash: row.get(10)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -122,7 +129,6 @@ impl<'a> HallStore<'a> {
         Ok(halls)
     }
 
-    /// Add membership
     #[instrument(skip(self, membership), fields(user_id = %membership.user_id, hall_id = %membership.hall_id, role = ?membership.role))]
     pub fn add_member(&self, membership: &Membership) -> Result<()> {
         self.conn.execute(
@@ -140,7 +146,6 @@ impl<'a> HallStore<'a> {
         Ok(())
     }
 
-    /// Get membership
     #[instrument(skip(self))]
     pub fn get_membership(&self, user_id: Uuid, hall_id: Uuid) -> Result<Option<Membership>> {
         let mut stmt = self.conn.prepare(
@@ -164,7 +169,6 @@ impl<'a> HallStore<'a> {
         Ok(membership)
     }
 
-    /// Update membership role
     #[instrument(skip(self))]
     pub fn update_role(&self, user_id: Uuid, hall_id: Uuid, new_role: HallRole) -> Result<()> {
         self.conn.execute(
@@ -174,7 +178,6 @@ impl<'a> HallStore<'a> {
         Ok(())
     }
 
-    /// Update online status
     #[instrument(skip(self))]
     pub fn update_online_status(
         &self,
@@ -189,7 +192,6 @@ impl<'a> HallStore<'a> {
         Ok(())
     }
 
-    /// Remove membership
     #[instrument(skip(self))]
     pub fn remove_member(&self, user_id: Uuid, hall_id: Uuid) -> Result<()> {
         self.conn.execute(
@@ -199,7 +201,6 @@ impl<'a> HallStore<'a> {
         Ok(())
     }
 
-    /// List members of a Hall with user info
     #[instrument(skip(self))]
     pub fn list_members(&self, hall_id: Uuid) -> Result<Vec<MemberInfo>> {
         let mut stmt = self.conn.prepare(
@@ -229,14 +230,12 @@ impl<'a> HallStore<'a> {
         Ok(members)
     }
 
-    /// Get user's role in a Hall
     #[instrument(skip(self))]
     pub fn get_user_role(&self, user_id: Uuid, hall_id: Uuid) -> Result<Option<HallRole>> {
         let membership = self.get_membership(user_id, hall_id)?;
         Ok(membership.map(|m| m.role))
     }
 
-    /// Set hall host (for host election persistence)
     #[instrument(skip(self))]
     pub fn set_hall_host(&self, hall_id: Uuid, user_id: Uuid, epoch: u64) -> Result<()> {
         self.conn.execute(
@@ -246,7 +245,6 @@ impl<'a> HallStore<'a> {
         Ok(())
     }
 
-    /// Get current hall host (user_id, epoch)
     #[instrument(skip(self))]
     pub fn get_hall_host(&self, hall_id: Uuid) -> Result<Option<(Uuid, u64)>> {
         let mut stmt = self
@@ -270,7 +268,6 @@ impl<'a> HallStore<'a> {
         }
     }
 
-    /// Get current host username for a hall
     #[instrument(skip(self))]
     pub fn get_current_host_name(&self, hall_id: Uuid) -> Result<Option<String>> {
         let mut stmt = self.conn.prepare(

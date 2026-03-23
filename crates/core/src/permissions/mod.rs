@@ -42,6 +42,38 @@ pub enum HallAction {
     DeleteFromChest,
     ManageChest,
 
+    // Channels
+    CreateChannel,
+    EditChannel,
+    DeleteChannel,
+    ManageChannelPermissions,
+
+    // Reactions
+    AddReactions,
+    ManageReactions,
+
+    // Threads
+    CreateThreads,
+    ManageThreads,
+
+    // Webhooks
+    CreateWebhook,
+    ManageWebhooks,
+
+    // Emoji
+    ManageEmoji,
+
+    // Voice
+    ConnectVoice,
+    Speak,
+    Stream,
+    MuteMembers,
+    DeafenMembers,
+    MoveMembers,
+
+    // Mentions
+    MentionEveryone,
+
     // Parlors (future)
     ViewParlors,
     ActivateParlor,
@@ -94,6 +126,38 @@ impl PermissionMatrix {
             HallAction::WriteChest => role >= HallRole::HallAgent,
             HallAction::DeleteFromChest => role >= HallRole::HallAgent,
             HallAction::ManageChest => role >= HallRole::HallPrefect,
+
+            // Channels - Moderator+ can create/edit, Prefect+ can delete/manage perms
+            HallAction::CreateChannel => role >= HallRole::HallModerator,
+            HallAction::EditChannel => role >= HallRole::HallModerator,
+            HallAction::DeleteChannel => role >= HallRole::HallPrefect,
+            HallAction::ManageChannelPermissions => role >= HallRole::HallPrefect,
+
+            // Reactions - everyone can react, Moderator+ can manage (clear reactions)
+            HallAction::AddReactions => role >= HallRole::HallFellow,
+            HallAction::ManageReactions => role >= HallRole::HallModerator,
+
+            // Threads - Agent+ can create, Moderator+ can manage (archive, lock)
+            HallAction::CreateThreads => role >= HallRole::HallAgent,
+            HallAction::ManageThreads => role >= HallRole::HallModerator,
+
+            // Webhooks - Moderator+ can create, Prefect+ can manage all
+            HallAction::CreateWebhook => role >= HallRole::HallModerator,
+            HallAction::ManageWebhooks => role >= HallRole::HallPrefect,
+
+            // Emoji - Moderator+ can manage custom emoji
+            HallAction::ManageEmoji => role >= HallRole::HallModerator,
+
+            // Voice - Agent+ can connect and speak, Moderator+ can moderate
+            HallAction::ConnectVoice => role >= HallRole::HallAgent,
+            HallAction::Speak => role >= HallRole::HallAgent,
+            HallAction::Stream => role >= HallRole::HallAgent,
+            HallAction::MuteMembers => role >= HallRole::HallModerator,
+            HallAction::DeafenMembers => role >= HallRole::HallModerator,
+            HallAction::MoveMembers => role >= HallRole::HallModerator,
+
+            // Mentions - Moderator+ can @everyone/@here
+            HallAction::MentionEveryone => role >= HallRole::HallModerator,
 
             // Parlors - viewing for Agent+, management for Prefect+
             HallAction::ViewParlors => role >= HallRole::HallAgent,

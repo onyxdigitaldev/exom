@@ -1,9 +1,10 @@
 //! Exom Core Library
 //!
-//! Core models, permissions, hosting logic, and storage for the Exom platform.
+//! Core models, permissions, hosting logic, storage, and events for the Exom platform.
 
 pub mod chest;
 pub mod error;
+pub mod events;
 pub mod hosting;
 pub mod models;
 pub mod permissions;
@@ -11,9 +12,13 @@ pub mod storage;
 
 pub use chest::HallChest;
 pub use error::{Error, Result};
+pub use events::*;
 pub use hosting::*;
 pub use models::*;
 pub use permissions::*;
 pub use storage::{
-    Database, HallRepository, InviteRepository, MessageRepository, Storage, UserRepository,
+    AttachmentStore, ChannelRepository, ChannelStore, Database, DiscoveryStore, DmStore,
+    EmojiStore, HallRepository, HallStore, InviteRepository, InviteStore, MessageRepository,
+    MessageStore, ModerationStore, NotificationStore, PermissionOverrideStore, ProfileStore,
+    ReactionStore, RelationshipStore, Storage, UserRepository, UserStore, VoiceStore, WebhookStore,
 };

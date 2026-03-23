@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use super::ParlorId;
 
-/// A Hall is a shared workspace with members, roles, and chat
+/// A Hall is a shared workspace with members, roles, channels, and chat
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hall {
     pub id: Uuid,
@@ -20,6 +20,12 @@ pub struct Hall {
     pub current_host_id: Option<Uuid>,
     /// Election epoch to prevent split-host scenarios
     pub election_epoch: u64,
+    /// Hall icon image hash
+    pub icon_hash: Option<String>,
+    /// Hall banner image hash
+    pub banner_hash: Option<String>,
+    /// Hall invite splash image hash
+    pub splash_hash: Option<String>,
 }
 
 impl Hall {
@@ -33,6 +39,9 @@ impl Hall {
             active_parlor: None,
             current_host_id: None,
             election_epoch: 0,
+            icon_hash: None,
+            banner_hash: None,
+            splash_hash: None,
         }
     }
 

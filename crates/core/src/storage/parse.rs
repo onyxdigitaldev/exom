@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::Error as SqlError;
 use uuid::Uuid;
 
-use crate::models::{HallRole, ParlorId};
+use crate::models::{ChannelType, HallRole, ParlorId};
 
 /// Parse a UUID from a database string column
 pub fn parse_uuid(s: &str) -> Result<Uuid, SqlError> {
@@ -47,6 +47,18 @@ pub fn role_from_u8(value: u8) -> HallRole {
         3 => HallRole::HallModerator,
         2 => HallRole::HallAgent,
         _ => HallRole::HallFellow,
+    }
+}
+
+/// Convert a u8 to ChannelType
+pub fn channel_type_from_u8(value: u8) -> ChannelType {
+    match value {
+        0 => ChannelType::Text,
+        1 => ChannelType::Voice,
+        2 => ChannelType::Category,
+        3 => ChannelType::Announcement,
+        4 => ChannelType::Stage,
+        _ => ChannelType::Text,
     }
 }
 

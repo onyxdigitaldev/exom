@@ -1,15 +1,41 @@
 //! Data models for Exom
 
+mod attachment;
+mod channel;
+mod discovery;
+mod dm;
+mod emoji;
 mod hall;
 mod invite;
 mod membership;
 mod message;
+mod moderation;
+mod notification;
 mod parlor;
+mod permission_override;
+mod profile;
+mod reaction;
+mod relationship;
 mod user;
+mod voice;
+mod webhook;
 
+pub use attachment::*;
+pub use channel::*;
+pub use discovery::*;
+pub use dm::*;
+pub use emoji::*;
 pub use hall::*;
 pub use invite::*;
 pub use membership::*;
 pub use message::*;
+pub use moderation::*;
+pub use notification::*;
 pub use parlor::*;
+pub use permission_override::*;
+pub use profile::*;
+pub use reaction::*;
+pub use relationship::*;
 pub use user::*;
+pub use voice::*;
+pub use webhook::*;
