@@ -128,8 +128,39 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
       preload: path.join(__dirname, 'preload.js'),
     },
+  })
+
+  // Content Security Policy — restrict what the renderer can load
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline'",   // Vite HMR needs inline in dev
+            "style-src 'self' 'unsafe-inline'",     // Tailwind needs inline styles
+            "img-src 'self' data: blob: http://localhost:*",
+            "font-src 'self' data:",
+            "connect-src 'self' http://localhost:* ws://localhost:*",
+            "media-src 'self' blob:",
+            "worker-src 'self' blob:",
+          ].join('; '),
+        ],
+      },
+    })
+  })
+
+  // Block navigation to external URLs (prevent phishing via redirect)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const parsed = new URL(url)
+    if (parsed.origin !== 'http://localhost:5173' && !url.startsWith('file://')) {
+      event.preventDefault()
+    }
   })
 
   if (state.maximized) {

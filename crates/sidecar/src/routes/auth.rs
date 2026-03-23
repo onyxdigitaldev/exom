@@ -55,6 +55,8 @@ pub async fn login(
     State(state): State<Arc<AppState>>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<ErrorBody>)> {
+    crate::validation::validate_username(&req.username)?;
+
     let db = state.db.lock().unwrap();
 
     let user = db
@@ -93,12 +95,8 @@ pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<ErrorBody>)> {
-    if req.username.len() < 3 {
-        return Err(err(StatusCode::BAD_REQUEST, "Username must be at least 3 characters"));
-    }
-    if req.password.len() < 6 {
-        return Err(err(StatusCode::BAD_REQUEST, "Password must be at least 6 characters"));
-    }
+    crate::validation::validate_username(&req.username)?;
+    crate::validation::validate_password(&req.password)?;
 
     let db = state.db.lock().unwrap();
 

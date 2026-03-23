@@ -6,6 +6,7 @@
 /// involved in real-time message routing.
 
 mod routes;
+pub mod validation;
 mod state;
 
 use std::net::SocketAddr;
@@ -37,8 +38,10 @@ async fn main() {
         AppState::new(relay_secret).expect("failed to initialize sidecar state"),
     );
 
+    // CORS: Only allow requests from the local Electron renderer.
+    // In production, this should be locked to file:// or the app's origin.
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin("http://localhost:5173".parse::<axum::http::HeaderValue>().unwrap())
         .allow_methods(Any)
         .allow_headers(Any);
 
