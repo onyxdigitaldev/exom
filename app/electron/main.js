@@ -136,7 +136,7 @@ function createTray() {
 
 // ── Main window ─────────────────────────────────
 
-function createWindow() {
+async function createWindow() {
   const state = loadWindowState()
 
   mainWindow = new BrowserWindow({
@@ -198,10 +198,29 @@ function createWindow() {
     mainWindow.show()
   })
 
+  // Load the frontend — try Vite dev server first, fall back to built files
+  const distPath = path.join(__dirname, '..', 'dist', 'index.html')
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173')
+    // Check if Vite dev server is running
+    const http = require('http')
+    const viteRunning = await new Promise((resolve) => {
+      const req = http.get('http://localhost:5173', () => resolve(true))
+      req.on('error', () => resolve(false))
+      req.setTimeout(1000, () => { req.destroy(); resolve(false) })
+    })
+
+    if (viteRunning) {
+      mainWindow.loadURL('http://localhost:5173')
+    } else if (fs.existsSync(distPath)) {
+      console.log('[electron] Vite not running, loading built files from dist/')
+      mainWindow.loadFile(distPath)
+    } else {
+      console.error('[electron] No frontend available. Run "npm run build" or "npm run dev" first.')
+      mainWindow.loadURL('data:text/html,<body style="background:#0f0f14;color:#e4e4e7;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h1>Exom</h1><p>Frontend not built yet.</p><pre style="color:#a1a1aa">cd app %26%26 npm run build</pre></div></body>')
+    }
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+    mainWindow.loadFile(distPath)
   }
 
   // Open external links in system browser
@@ -256,7 +275,7 @@ ipcMain.handle('set-badge', (_, count) => {
 app.whenReady().then(async () => {
   await startSidecar()
   createTray()
-  createWindow()
+  await createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
