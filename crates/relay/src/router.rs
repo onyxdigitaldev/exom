@@ -6,11 +6,12 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 use exom_protocol::{ClientMessage, ErrorCode, ServerMessage};
 
+use crate::ratelimit::RateLimitKind;
 use crate::state::RelayState;
 
 /// Process a client message and route it
@@ -83,6 +84,10 @@ pub async fn route(
                 send_error(state, conn_id, ErrorCode::NotInHall, "Not subscribed to this hall").await;
                 return;
             }
+            if !state.check_rate_limit(user_id, RateLimitKind::Message).await {
+                send_error(state, conn_id, ErrorCode::RateLimited, "Message rate limit exceeded").await;
+                return;
+            }
 
             // Broadcast to all hall members (including sender for confirmation)
             let server_msg = ServerMessage::ChannelMessage {
@@ -96,7 +101,7 @@ pub async fn route(
             state.broadcast_to_hall(hall_id, Some(conn_id), server_msg.clone()).await;
 
             // Queue for offline members
-            queue_for_offline_hall_members(state, hall_id, conn_id, &server_msg).await;
+            state.queue_for_offline_members(hall_id, user_id, &server_msg).await;
         }
 
         ClientMessage::MessageEdit {
@@ -158,6 +163,9 @@ pub async fn route(
             if !is_in_hall(state, conn_id, hall_id).await {
                 return;
             }
+            if !state.check_rate_limit(user_id, RateLimitKind::Reaction).await {
+                return;
+            }
 
             state
                 .broadcast_to_hall(
@@ -207,6 +215,9 @@ pub async fn route(
             // Ephemeral — never queued
             if !is_in_hall(state, conn_id, hall_id).await {
                 return;
+            }
+            if !state.check_rate_limit(user_id, RateLimitKind::Typing).await {
+                return; // silently drop, no error for typing
             }
 
             state
@@ -426,21 +437,80 @@ pub async fn route(
 
         ClientMessage::DirectMessage {
             channel_id,
+            recipients,
             message,
         } => {
-            // DMs go directly to the target user(s)
-            // The client knows the participants; relay just forwards
-            // For now, broadcast to the channel_id as a "room"
-            // The client-side DM system handles participant resolution
-            let _msg = ServerMessage::DirectMessage {
+            // Register participants if not already known
+            if !recipients.is_empty() {
+                state.register_dm_participants(channel_id, recipients).await;
+            }
+
+            let server_msg = ServerMessage::DirectMessage {
                 channel_id,
                 sender_id: user_id,
                 message,
             };
-            // DM delivery is user-to-user, not hall-based
-            // Queue if offline (the client provides target user IDs in a future extension)
-            // For now this is a placeholder — full DM routing requires participant lookup
-            warn!("DM routing not yet fully implemented");
+
+            // Route to all DM participants (queue if offline)
+            state
+                .send_to_dm_participants(channel_id, user_id, &server_msg)
+                .await;
+        }
+
+        ClientMessage::DmChannelOpen {
+            channel_id,
+            participants,
+        } => {
+            state
+                .register_dm_participants(channel_id, participants)
+                .await;
+        }
+
+        // --- Hall member sync ---
+
+        ClientMessage::HallMemberSync {
+            hall_id,
+            member_ids,
+        } => {
+            let count = state.sync_hall_members(hall_id, member_ids).await;
+            send_to_conn(
+                state,
+                conn_id,
+                ServerMessage::HallMemberSynced {
+                    hall_id,
+                    member_count: count,
+                },
+            )
+            .await;
+            info!(hall_id = %hall_id, count = count, "hall member list synced");
+        }
+
+        // --- File uploads ---
+
+        ClientMessage::FileUploaded {
+            hall_id,
+            channel_id,
+            message_id,
+            attachment,
+        } => {
+            if !is_in_hall(state, conn_id, hall_id).await {
+                return;
+            }
+
+            let server_msg = ServerMessage::FileUploaded {
+                hall_id,
+                channel_id,
+                message_id,
+                sender_id: user_id,
+                attachment,
+            };
+
+            state
+                .broadcast_to_hall(hall_id, Some(conn_id), server_msg.clone())
+                .await;
+            state
+                .queue_for_offline_members(hall_id, user_id, &server_msg)
+                .await;
         }
 
         // --- Sync ---
@@ -477,8 +547,8 @@ pub async fn route(
             }
         }
 
-        _ => {
-            send_error(state, conn_id, ErrorCode::UnknownMessage, "Unknown message type").await;
+        ClientMessage::Authenticate(_) => {
+            // Already handled in connection.rs before routing starts
         }
     }
 }
@@ -519,15 +589,3 @@ async fn send_error(
     .await;
 }
 
-/// Queue a message for all offline members of a hall
-async fn queue_for_offline_hall_members(
-    _state: &Arc<RelayState>,
-    _hall_id: Uuid,
-    _exclude_conn: Uuid,
-    _msg: &ServerMessage,
-) {
-    // This is a simplified version — in production, we'd need the full
-    // member list from the authoritative source (the host client).
-    // For now, the relay only queues for users it has seen connect before.
-    // TODO: Implement hall member registry at relay level
-}

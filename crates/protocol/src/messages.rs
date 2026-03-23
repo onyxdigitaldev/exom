@@ -138,10 +138,26 @@ pub enum ClientMessage {
 
     // --- DMs ---
 
-    /// Send a direct message
+    /// Send a direct message (includes recipients for relay routing)
     DirectMessage {
         channel_id: Uuid,
+        /// All participant user_ids in this DM channel (relay uses for routing)
+        recipients: Vec<Uuid>,
         message: MessagePayload,
+    },
+
+    /// Register DM channel participants at the relay
+    DmChannelOpen {
+        channel_id: Uuid,
+        participants: Vec<Uuid>,
+    },
+
+    // --- Hall member sync ---
+
+    /// Sync the full member list for a Hall (sent by host/authoritative client)
+    HallMemberSync {
+        hall_id: Uuid,
+        member_ids: Vec<Uuid>,
     },
 
     // --- Sync ---
@@ -154,6 +170,16 @@ pub enum ClientMessage {
 
     /// Request the offline message queue
     QueueDrain,
+
+    // --- File upload ---
+
+    /// Notify channel that a file was uploaded (after HTTP upload completes)
+    FileUploaded {
+        hall_id: Uuid,
+        channel_id: Uuid,
+        message_id: Uuid,
+        attachment: AttachmentMeta,
+    },
 }
 
 // ──────────────────────────────────────────────
@@ -347,6 +373,25 @@ pub enum ServerMessage {
     SyncResponse {
         hall_id: Uuid,
         events: Vec<ServerMessage>,
+    },
+
+    // --- Files ---
+
+    /// A file was uploaded to a channel
+    FileUploaded {
+        hall_id: Uuid,
+        channel_id: Uuid,
+        message_id: Uuid,
+        sender_id: Uuid,
+        attachment: AttachmentMeta,
+    },
+
+    // --- Hall sync ---
+
+    /// Hall member list was synced (confirmation)
+    HallMemberSynced {
+        hall_id: Uuid,
+        member_count: u32,
     },
 
     // --- Errors ---

@@ -8,6 +8,7 @@ use uuid::Uuid;
 use exom_protocol::ServerMessage;
 
 use crate::queue::MessageQueue;
+use crate::ratelimit::{RateLimitKind, RateLimiter};
 
 /// Per-connection sender handle
 pub type ClientSender = tokio::sync::mpsc::UnboundedSender<ServerMessage>;
@@ -31,24 +32,38 @@ pub struct RelayState {
     pub user_connections: RwLock<HashMap<Uuid, Uuid>>,
     /// Hall subscriptions: hall_id -> set of connection_ids
     pub hall_members: RwLock<HashMap<Uuid, HashSet<Uuid>>>,
+    /// Hall member registry: hall_id -> all member user_ids (for offline queuing)
+    pub hall_all_members: RwLock<HashMap<Uuid, HashSet<Uuid>>>,
+    /// DM channel participants: dm_channel_id -> set of user_ids
+    pub dm_participants: RwLock<HashMap<Uuid, HashSet<Uuid>>>,
     /// Voice channels: (hall_id, channel_id) -> set of user_ids
     pub voice_channels: RwLock<HashMap<(Uuid, Uuid), HashSet<Uuid>>>,
     /// Offline message queue
     pub queue: Mutex<MessageQueue>,
     /// Relay secret for token validation
     pub secret: String,
+    /// File storage base path
+    pub file_storage_path: std::path::PathBuf,
+    /// Rate limiter
+    pub rate_limiter: Mutex<RateLimiter>,
 }
 
 impl RelayState {
     pub fn new(db_path: &str, secret: String) -> Result<Self, Box<dyn std::error::Error>> {
         let queue = MessageQueue::open(db_path)?;
+        let file_path = std::path::PathBuf::from("data/files");
+        std::fs::create_dir_all(&file_path)?;
         Ok(Self {
             clients: RwLock::new(HashMap::new()),
             user_connections: RwLock::new(HashMap::new()),
             hall_members: RwLock::new(HashMap::new()),
+            hall_all_members: RwLock::new(HashMap::new()),
+            dm_participants: RwLock::new(HashMap::new()),
             voice_channels: RwLock::new(HashMap::new()),
             queue: Mutex::new(queue),
             secret,
+            file_storage_path: file_path,
+            rate_limiter: Mutex::new(RateLimiter::new()),
         })
     }
 
@@ -246,5 +261,98 @@ impl RelayState {
             .get(&(hall_id, channel_id))
             .map(|users| users.iter().copied().collect())
             .unwrap_or_default()
+    }
+
+    // --- DM routing ---
+
+    /// Register DM channel participants
+    pub async fn register_dm_participants(&self, channel_id: Uuid, participants: Vec<Uuid>) {
+        self.dm_participants
+            .write()
+            .await
+            .insert(channel_id, participants.into_iter().collect());
+    }
+
+    /// Get DM channel participants
+    pub async fn get_dm_participants(&self, channel_id: Uuid) -> Vec<Uuid> {
+        self.dm_participants
+            .read()
+            .await
+            .get(&channel_id)
+            .map(|p| p.iter().copied().collect())
+            .unwrap_or_default()
+    }
+
+    /// Send a message to all DM participants (except sender), queue if offline
+    pub async fn send_to_dm_participants(
+        &self,
+        channel_id: Uuid,
+        exclude_user: Uuid,
+        msg: &ServerMessage,
+    ) {
+        let participants = self.get_dm_participants(channel_id).await;
+        for user_id in participants {
+            if user_id == exclude_user {
+                continue;
+            }
+            if !self.send_to_user(user_id, msg.clone()).await {
+                // User is offline — queue it
+                let queue = self.queue.lock().await;
+                let _ = queue.enqueue(user_id, msg);
+            }
+        }
+    }
+
+    // --- Hall member registry ---
+
+    /// Set the full member list for a Hall (for offline queuing)
+    pub async fn sync_hall_members(&self, hall_id: Uuid, member_ids: Vec<Uuid>) -> u32 {
+        let count = member_ids.len() as u32;
+        self.hall_all_members
+            .write()
+            .await
+            .insert(hall_id, member_ids.into_iter().collect());
+        count
+    }
+
+    /// Queue a message for all offline members of a hall
+    pub async fn queue_for_offline_members(
+        &self,
+        hall_id: Uuid,
+        exclude_user: Uuid,
+        msg: &ServerMessage,
+    ) {
+        let all_members = {
+            self.hall_all_members
+                .read()
+                .await
+                .get(&hall_id)
+                .cloned()
+                .unwrap_or_default()
+        };
+
+        let online_members: HashSet<Uuid> = self.online_members_in_hall(hall_id).await.into_iter().collect();
+
+        let queue = self.queue.lock().await;
+        for user_id in all_members {
+            if user_id == exclude_user {
+                continue;
+            }
+            if !online_members.contains(&user_id) {
+                let _ = queue.enqueue(user_id, msg);
+            }
+        }
+    }
+
+    // --- Rate limiting ---
+
+    /// Check if an action is allowed under rate limits
+    pub async fn check_rate_limit(&self, user_id: Uuid, kind: RateLimitKind) -> bool {
+        self.rate_limiter.lock().await.check(user_id, kind)
+    }
+
+    /// Clean up stale rate limit buckets
+    pub async fn cleanup_rate_limits(&self) {
+        self.rate_limiter.lock().await.cleanup();
     }
 }
