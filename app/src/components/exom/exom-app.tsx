@@ -116,17 +116,16 @@ export function ExomApp() {
     }
   }, [addMessage, updateMessage, removeMessage, setOnline, setOffline, presence, voice, invalidateReactions, activeHallId, activeChannelId, loadMessages])
 
-  // Re-subscribe to active hall on reconnect
-  const handleWsStateChange = useCallback((state: string) => {
-    if (state === 'connected' && activeHallId) {
-      send({ HallJoin: { hall_id: activeHallId } })
-    }
-  }, [activeHallId, send])
-
   const { connect, send, state: wsState } = useWebSocket({
     onEvent: handleRelayEvent,
-    onStateChange: handleWsStateChange,
   })
+
+  // Re-subscribe to active hall on reconnect
+  useEffect(() => {
+    if (wsState === 'connected' && activeHallId) {
+      send({ HallJoin: { hall_id: activeHallId } })
+    }
+  }, [wsState, activeHallId, send])
 
   // Load halls on auth
   useEffect(() => {

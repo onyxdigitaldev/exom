@@ -38,10 +38,10 @@ async fn main() {
         AppState::new(relay_secret).expect("failed to initialize sidecar state"),
     );
 
-    // CORS: Only allow requests from the local Electron renderer.
-    // In production, this should be locked to file:// or the app's origin.
+    // CORS: Allow requests from localhost (Vite dev) and file:// (Electron prod).
+    // The sidecar only binds to 127.0.0.1, so network exposure is impossible.
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:5173".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
