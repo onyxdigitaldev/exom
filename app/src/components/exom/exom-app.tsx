@@ -14,10 +14,10 @@ import { useHallStore } from "@/stores/hallStore"
 import { useMessageStore } from "@/stores/messageStore"
 import { useMemberStore } from "@/stores/memberStore"
 import { useUiStore } from "@/stores/uiStore"
-import { useVoiceStore } from "@/stores/voiceStore"
 import { usePresenceStore } from "@/stores/presenceStore"
 import { useReactionStore } from "@/stores/reactionStore"
 import { useWebSocket, type RelayEvent } from "@/hooks/useWebSocket"
+import { useVoice } from "@/hooks/useVoice"
 
 export function ExomApp() {
   const { isAuthenticated, user } = useAuthStore()
@@ -25,7 +25,7 @@ export function ExomApp() {
   const { loadMessages, addMessage, updateMessage, removeMessage } = useMessageStore()
   const { loadMembers, setOnline, setOffline } = useMemberStore()
   const ui = useUiStore()
-  const voice = useVoiceStore()
+  const voice = useVoice()
   const presence = usePresenceStore()
   const { invalidate: invalidateReactions } = useReactionStore()
 
@@ -91,23 +91,14 @@ export function ExomApp() {
         invalidateReactions(message_id)
         break
       }
-      case 'VoiceUserJoined': {
-        const { channel_id, user_id } = event as RelayEvent & { channel_id: string; user_id: string }
-        voice.addUser(channel_id, {
-          user_id, username: '', self_mute: false, self_deaf: false, video: false, streaming: false,
-        })
-        break
-      }
-      case 'VoiceUserLeft': {
-        const { channel_id, user_id } = event as RelayEvent & { channel_id: string; user_id: string }
-        voice.removeUser(channel_id, user_id)
-        break
-      }
+      // Voice signaling — delegate to useVoice hook
+      case 'VoiceUserJoined':
+      case 'VoiceUserLeft':
+      case 'VoiceOffer':
+      case 'VoiceAnswer':
+      case 'VoiceIceCandidate':
       case 'VoiceStateUpdated': {
-        const { channel_id, user_id, self_mute, self_deaf, video, streaming } = event as RelayEvent & {
-          channel_id: string; user_id: string; self_mute: boolean; self_deaf: boolean; video: boolean; streaming: boolean
-        }
-        voice.updateUser(channel_id, user_id, { self_mute, self_deaf, video, streaming })
+        voice.handleVoiceEvent(event)
         break
       }
     }
@@ -180,6 +171,7 @@ export function ExomApp() {
                 onInvite={() => ui.setShowInvite(true)}
                 onHallSettings={() => ui.setShowHallSettings(true)}
                 onCreateChannel={() => ui.setShowCreateChannel(true)}
+                voice={voice}
               />
             </div>
 

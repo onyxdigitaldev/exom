@@ -13,6 +13,7 @@ import {
   Users
 } from "lucide-react"
 import { useHallStore } from "@/stores/hallStore"
+import { VoicePanel } from "./voice-panel"
 import type { Channel } from "@/lib/types"
 import {
   DropdownMenu,
@@ -22,6 +23,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+interface VoiceControls {
+  isConnected: boolean
+  connectedChannel: { hall_id: string; channel_id: string; channel_name: string } | null
+  localMedia: { audioEnabled: boolean; videoEnabled: boolean; screenShareEnabled: boolean }
+  peers: { userId: string }[]
+  join: (hallId: string, channelId: string, channelName: string) => Promise<void>
+  leave: () => void
+  toggleMute: () => void
+  toggleDeaf: () => void
+  toggleVideo: () => Promise<void>
+  toggleScreenShare: () => Promise<void>
+}
+
 interface ChannelPanelProps {
   hallId: string
   activeChannel: string
@@ -29,6 +43,7 @@ interface ChannelPanelProps {
   onInvite: () => void
   onHallSettings: () => void
   onCreateChannel: () => void
+  voice?: VoiceControls
 }
 
 export function ChannelPanel({
@@ -38,6 +53,7 @@ export function ChannelPanel({
   onInvite,
   onHallSettings,
   onCreateChannel,
+  voice,
 }: ChannelPanelProps) {
   const { halls, channels } = useHallStore()
   const hall = halls.find(h => h.id === hallId)
@@ -157,7 +173,13 @@ export function ChannelPanel({
                     return (
                       <button
                         key={channel.id}
-                        onClick={() => onChannelSelect(channel.id)}
+                        onClick={() => {
+                          if ((channel.channel_type === 'voice' || channel.channel_type === 'stage') && voice) {
+                            voice.join(hallId, channel.id, channel.name)
+                          } else {
+                            onChannelSelect(channel.id)
+                          }
+                        }}
                         className={cn(
                           "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-all group",
                           isActive
@@ -183,6 +205,24 @@ export function ChannelPanel({
           )
         })}
       </div>
+
+      {/* Voice connected bar */}
+      {voice?.isConnected && voice.connectedChannel && (
+        <VoicePanel
+          channelName={voice.connectedChannel.channel_name}
+          connectedAt={Date.now()}
+          selfMute={!voice.localMedia.audioEnabled}
+          selfDeaf={false}
+          video={voice.localMedia.videoEnabled}
+          streaming={voice.localMedia.screenShareEnabled}
+          peerCount={voice.peers.length}
+          onToggleMute={voice.toggleMute}
+          onToggleDeaf={voice.toggleDeaf}
+          onToggleVideo={voice.toggleVideo}
+          onToggleScreenShare={voice.toggleScreenShare}
+          onDisconnect={voice.leave}
+        />
+      )}
     </div>
   )
 }
