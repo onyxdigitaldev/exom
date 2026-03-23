@@ -4,7 +4,7 @@ members = [
     "crates/core",
     "crates/protocol",
     "crates/relay",
-    "crates/app",
+    "crates/sidecar",
 ]
 
 [workspace.package]
@@ -26,9 +26,6 @@ rand = "0.8"
 base64 = "0.22"
 directories = "5.0"
 
-# UI dependencies
-slint = "1.9"
-
 # Async runtime
 tokio = { version = "1.42", features = ["full"] }
 
@@ -36,6 +33,7 @@ tokio = { version = "1.42", features = ["full"] }
 axum = { version = "0.7", features = ["ws"] }
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
+tower-http = { version = "0.5", features = ["cors"] }
 
 # Serialization (wire format)
 rmp-serde = "1.3"
