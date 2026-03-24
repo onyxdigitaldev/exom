@@ -6,7 +6,6 @@ import { useHallStore } from "@/stores/hallStore"
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
@@ -33,7 +32,6 @@ export function TopNavigation({
   const displayName = user?.username ?? 'User'
 
   return (
-    <TooltipProvider delayDuration={100}>
       <header className="h-16 glass border-b border-border/50 flex items-center justify-between px-4 sticky top-0 z-50">
         {/* Left: Logo & Home */}
         <div className="flex items-center gap-3">
@@ -174,6 +172,5 @@ export function TopNavigation({
           </Tooltip>
         </div>
       </header>
-    </TooltipProvider>
   )
 }

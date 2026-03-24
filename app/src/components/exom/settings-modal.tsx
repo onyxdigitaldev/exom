@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import {
   X,
@@ -11,9 +11,11 @@ import {
   LogOut,
   ChevronRight,
   Camera,
-  Check
+  Check,
+  Save
 } from "lucide-react"
 import { useAuthStore } from "@/stores/authStore"
+import { profiles as profilesApi } from "@/lib/api"
 import { Switch } from "@/components/ui/switch"
 
 interface SettingsModalProps {
@@ -282,7 +284,11 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
           )}
 
-          {(activeTab === "profile" || activeTab === "privacy" || activeTab === "voice" || activeTab === "keybinds") && (
+          {activeTab === "profile" && (
+            <ProfileSettings />
+          )}
+
+          {(activeTab === "privacy" || activeTab === "voice" || activeTab === "keybinds") && (
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">
                 {tabs.find(t => t.id === activeTab)?.label}
@@ -293,6 +299,137 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Profile editing — display name, bio, custom status. */
+function ProfileSettings() {
+  const { user } = useAuthStore()
+  const [displayName, setDisplayName] = useState('')
+  const [bio, setBio] = useState('')
+  const [customStatus, setCustomStatus] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Load profile on mount
+  useEffect(() => {
+    if (!user) return
+    profilesApi.get(user.user_id).then((profile) => {
+      setDisplayName(profile.display_name ?? '')
+      setBio(profile.bio ?? '')
+      setCustomStatus(profile.custom_status_text ?? '')
+    }).catch(() => {
+      // Profile may not exist yet
+    })
+  }, [user])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaved(false)
+    try {
+      await profilesApi.update({
+        display_name: displayName || undefined,
+        bio: bio || undefined,
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      console.error('Failed to save profile:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-foreground mb-6">Profile</h2>
+
+      <div className="space-y-6">
+        {/* Avatar */}
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-bold border-4 border-card">
+              {(displayName || user?.username || '?').charAt(0).toUpperCase()}
+            </div>
+            <button className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center hover:bg-secondary/80 transition-colors">
+              <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">{user?.username}</p>
+            <p className="text-sm text-muted-foreground">Click the camera icon to upload an avatar</p>
+          </div>
+        </div>
+
+        <div className="h-px bg-border/50" />
+
+        {/* Display Name */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Display Name</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder={user?.username ?? 'Display name'}
+            maxLength={32}
+            className="w-full h-11 px-4 rounded-xl bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+          />
+          <p className="text-xs text-muted-foreground mt-1">This is how others see you. Leave blank to use your username.</p>
+        </div>
+
+        {/* Bio */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">About Me</label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="Tell people a little about yourself"
+            maxLength={190}
+            rows={3}
+            className="w-full px-4 py-3 rounded-xl bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all resize-none"
+          />
+          <p className="text-xs text-muted-foreground mt-1">{bio.length}/190</p>
+        </div>
+
+        {/* Custom Status */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Custom Status</label>
+          <input
+            type="text"
+            value={customStatus}
+            onChange={(e) => setCustomStatus(e.target.value)}
+            placeholder="What are you up to?"
+            maxLength={128}
+            className="w-full h-11 px-4 rounded-xl bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+          />
+        </div>
+
+        {/* Save Button */}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className={cn(
+            "px-6 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all",
+            saved
+              ? "bg-online text-white"
+              : "bg-primary text-primary-foreground hover:bg-primary/90",
+            saving && "opacity-50"
+          )}
+        >
+          {saved ? (
+            <>
+              <Check className="w-4 h-4" />
+              Saved
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              {saving ? "Saving..." : "Save Changes"}
+            </>
+          )}
+        </button>
       </div>
     </div>
   )

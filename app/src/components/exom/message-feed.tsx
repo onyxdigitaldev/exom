@@ -28,7 +28,6 @@ import type { Message as MessageType } from "@/lib/types"
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
@@ -100,7 +99,6 @@ function MessageComponent({
       {/* Action bar on hover */}
       {showActions && !isEditing && (
         <div className="absolute -top-4 right-4 flex items-center gap-0.5 bg-card border border-border rounded-lg shadow-lg p-1 z-10">
-          <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -148,7 +146,6 @@ function MessageComponent({
               </TooltipTrigger>
               <TooltipContent><p>Delete</p></TooltipContent>
             </Tooltip>
-          </TooltipProvider>
         </div>
       )}
 
@@ -358,7 +355,6 @@ export function MessageFeed({ channelId, showMembers, onToggleMembers }: Message
         </div>
 
         <div className="flex items-center gap-1">
-          <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors">
@@ -406,7 +402,6 @@ export function MessageFeed({ channelId, showMembers, onToggleMembers }: Message
               </TooltipTrigger>
               <TooltipContent><p>Search</p></TooltipContent>
             </Tooltip>
-          </TooltipProvider>
         </div>
       </div>
 

@@ -20,7 +20,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
@@ -71,7 +70,6 @@ export function VoicePanel({
   }, [connectedAt])
 
   return (
-    <TooltipProvider delayDuration={100}>
       <div className="mx-2 mb-2 rounded-xl bg-online/10 border border-online/20 overflow-hidden">
         {/* Status bar */}
         <div className="px-3 py-2 flex items-center justify-between">
@@ -175,6 +173,5 @@ export function VoicePanel({
           </Tooltip>
         </div>
       </div>
-    </TooltipProvider>
   )
 }
