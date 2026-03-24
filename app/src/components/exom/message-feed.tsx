@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
-import { 
-  Hash, 
-  Pin, 
-  Bell, 
-  Users, 
+import {
+  Hash,
+  Pin,
+  Bell,
+  Users,
   Search,
   Smile,
   Plus,
@@ -25,11 +25,6 @@ import { useUiStore } from "@/stores/uiStore"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { useReactionStore } from "@/stores/reactionStore"
 import type { Message as MessageType } from "@/lib/types"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 
 interface MessageFeedProps {
   channelId: string
@@ -88,7 +83,7 @@ function MessageComponent({
   const roleColor = getRoleColor(message.sender_role)
 
   return (
-    <div 
+    <div
       className={cn(
         "group relative px-4 py-1 hover:bg-secondary/30 transition-colors",
         !isGrouped && "mt-4 pt-2"
@@ -99,53 +94,37 @@ function MessageComponent({
       {/* Action bar on hover */}
       {showActions && !isEditing && (
         <div className="absolute -top-4 right-4 flex items-center gap-0.5 bg-card border border-border rounded-lg shadow-lg p-1 z-10">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onReply(message)}
-                  className="p-1.5 rounded hover:bg-secondary transition-colors"
-                >
-                  <Reply className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Reply</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onPin(message.id, message.is_pinned)}
-                  className="p-1.5 rounded hover:bg-secondary transition-colors"
-                >
-                  <Pin className={cn("w-4 h-4", message.is_pinned ? "text-primary" : "text-muted-foreground")} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>{message.is_pinned ? 'Unpin' : 'Pin'}</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    setIsEditing(true)
-                    setLocalEdit(message.content)
-                  }}
-                  className="p-1.5 rounded hover:bg-secondary transition-colors"
-                >
-                  <Pencil className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Edit</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onDelete(message.id)}
-                  className="p-1.5 rounded hover:bg-destructive/20 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Delete</p></TooltipContent>
-            </Tooltip>
+            <button
+              title="Reply"
+              onClick={() => onReply(message)}
+              className="p-1.5 rounded hover:bg-secondary transition-colors"
+            >
+              <Reply className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              title={message.is_pinned ? 'Unpin' : 'Pin'}
+              onClick={() => onPin(message.id, message.is_pinned)}
+              className="p-1.5 rounded hover:bg-secondary transition-colors"
+            >
+              <Pin className={cn("w-4 h-4", message.is_pinned ? "text-primary" : "text-muted-foreground")} />
+            </button>
+            <button
+              title="Edit"
+              onClick={() => {
+                setIsEditing(true)
+                setLocalEdit(message.content)
+              }}
+              className="p-1.5 rounded hover:bg-secondary transition-colors"
+            >
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              title="Delete"
+              onClick={() => onDelete(message.id)}
+              className="p-1.5 rounded hover:bg-destructive/20 transition-colors"
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </button>
         </div>
       )}
 
@@ -167,7 +146,7 @@ function MessageComponent({
           {/* Header (username, time) */}
           {!isGrouped && (
             <div className="flex items-baseline gap-2 mb-1">
-              <span 
+              <span
                 className="font-semibold text-sm hover:underline cursor-pointer"
                 style={{ color: roleColor }}
               >
@@ -355,53 +334,41 @@ export function MessageFeed({ channelId, showMembers, onToggleMembers }: Message
         </div>
 
         <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors">
-                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Threads</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors">
-                  <Pin className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Pinned Messages</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors">
-                  <Bell className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Notification Settings</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button 
-                  onClick={onToggleMembers}
-                  className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                    showMembers ? "bg-primary/20 text-primary" : "hover:bg-secondary/50 text-muted-foreground"
-                  )}
-                >
-                  <Users className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Member List</p></TooltipContent>
-            </Tooltip>
+            <button
+              title="Threads"
+              className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors"
+            >
+              <MessageSquare className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              title="Pinned Messages"
+              className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors"
+            >
+              <Pin className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              title="Notification Settings"
+              className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors"
+            >
+              <Bell className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              title="Member List"
+              onClick={onToggleMembers}
+              className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                showMembers ? "bg-primary/20 text-primary" : "hover:bg-secondary/50 text-muted-foreground"
+              )}
+            >
+              <Users className="w-4 h-4" />
+            </button>
             <div className="w-px h-5 bg-border/50 mx-1" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors">
-                  <Search className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent><p>Search</p></TooltipContent>
-            </Tooltip>
+            <button
+              title="Search"
+              className="w-8 h-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center transition-colors"
+            >
+              <Search className="w-4 h-4 text-muted-foreground" />
+            </button>
         </div>
       </div>
 
